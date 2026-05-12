@@ -1,9 +1,19 @@
 from core.constants import AI, HUMAN, EMPTY, WIN_LENGTH, DIRECTIONS
-from core.board import Board
+from core.board import Board, PLAYER_CODE
+
+try:
+    from accel import CYTHON_AVAILABLE, check_winner_at_codes, check_winner_full_codes
+except ImportError:
+    CYTHON_AVAILABLE = False
+    check_winner_at_codes = None
+    check_winner_full_codes = None
 
 
 def check_winner_at(board: Board, row: int, col: int, player: str) -> bool:
     """Return True if the last move at (row, col) completes a winning line."""
+    if CYTHON_AVAILABLE and check_winner_at_codes is not None:
+        return bool(check_winner_at_codes(board.cell_codes, board.size, row, col, PLAYER_CODE[player], WIN_LENGTH))
+
     if not board.in_bounds(row, col) or board.grid[row][col] != player:
         return False
 
@@ -35,6 +45,9 @@ def check_winner(board: Board, player: str) -> bool:
         if last_player == player:
             return check_winner_at(board, row, col, player)
         return False
+
+    if CYTHON_AVAILABLE and check_winner_full_codes is not None:
+        return bool(check_winner_full_codes(board.cell_codes, board.size, PLAYER_CODE[player], WIN_LENGTH))
 
     n = board.size
     for r in range(n):

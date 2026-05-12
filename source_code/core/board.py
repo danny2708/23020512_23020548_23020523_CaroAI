@@ -10,6 +10,12 @@ PLAYER_INDEX = {
     AI: 1,
 }
 
+PLAYER_CODE = {
+    EMPTY: 0,
+    HUMAN: 1,
+    AI: 2,
+}
+
 
 class Board:
     """Represent a Caro board using a 2D list."""
@@ -29,6 +35,7 @@ class Board:
 
         self.size = size
         self.grid = [row[:] for row in grid] if grid is not None else [[EMPTY for _ in range(size)] for _ in range(size)]
+        self.cell_codes = [0 for _ in range(size * size)]
         self.occupied_cells: set[tuple[int, int]] = set()
         self.move_stack = list(move_stack or [])
         self.hash_key = 0
@@ -61,11 +68,14 @@ class Board:
     def _rebuild_metadata(self) -> None:
         self.occupied_cells.clear()
         self.hash_key = 0
+        self.cell_codes = [0 for _ in range(self.size * self.size)]
         for row in range(self.size):
             if len(self.grid[row]) != self.size:
                 raise ValueError("Grid column count must match board size.")
             for col in range(self.size):
                 value = self.grid[row][col]
+                index = row * self.size + col
+                self.cell_codes[index] = PLAYER_CODE[value]
                 if value == EMPTY:
                     continue
                 self.occupied_cells.add((row, col))
@@ -81,6 +91,7 @@ class Board:
         if not self.is_empty_cell(row, col):
             return False
         self.grid[row][col] = player
+        self.cell_codes[row * self.size + col] = PLAYER_CODE[player]
         self.occupied_cells.add((row, col))
         self.move_stack.append((row, col, player))
         self.hash_key ^= self._zobrist[row][col][PLAYER_INDEX[player]]
@@ -95,6 +106,7 @@ class Board:
             return
 
         self.grid[row][col] = EMPTY
+        self.cell_codes[row * self.size + col] = PLAYER_CODE[EMPTY]
         self.occupied_cells.discard((row, col))
         self.hash_key ^= self._zobrist[row][col][PLAYER_INDEX[player]]
         if self.move_stack and self.move_stack[-1][:2] == (row, col):

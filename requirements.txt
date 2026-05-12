@@ -1,2 +1,8 @@
-# This template uses only Python standard library.
+# Runtime uses only Python standard library.
 # Recommended Python version: >=3.10
+#
+# Optional acceleration build:
+#   py -m pip install -r requirements.txt
+#   py setup_accel.py build_ext --inplace
+Cython>=3.0
+setuptools>=68

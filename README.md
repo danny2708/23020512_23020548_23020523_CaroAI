@@ -1,21 +1,24 @@
-# Caro AI - Minimax and Alpha-Beta
+# Caro AI - Minimax và Alpha-Beta
 
-Project template for the Caro AI assignment.
+Project phục vụ bài tập Caro AI.
 
-## Main requirements covered
+## Yêu cầu chính
 
-- 9x9 or larger Caro board.
+- Bàn cờ Caro kích thước tối thiểu `9x9`.
 - Human `X` vs AI `O`.
-- Win condition: 4 consecutive stones horizontally, vertically, or diagonally.
-- Level 1: Minimax with depth limit.
-- Level 2: Alpha-Beta pruning using the same evaluator and depth.
-- Level 3: Benchmark Minimax and Alpha-Beta on the same board states.
+- Điều kiện thắng: 4 quân liên tiếp theo hàng ngang, dọc hoặc chéo.
+- Level 1: Minimax có giới hạn độ sâu.
+- Level 2: Alpha-Beta pruning dùng cùng evaluator và cùng depth.
+- Level 3: Benchmark Minimax và Alpha-Beta trên cùng trạng thái bàn cờ.
 
-## Project structure
+## Cấu trúc
 
 ```text
 source_code/
 |-- main.py
+|-- accel/
+|   |-- __init__.py
+|   `-- caro_accel.pyx
 |-- core/
 |   |-- board.py
 |   |-- constants.py
@@ -40,99 +43,116 @@ source_code/
 `-- results/
 ```
 
-## Run desktop UI
+## Chạy UI
 
-From the project root:
+Từ thư mục gốc:
 
 ```bash
 cd source_code
 python main.py
 ```
 
-The UI includes:
+UI có các chế độ:
 
 - Human X vs AI O
 - AI X vs AI O
 - Benchmark Minimax vs Alpha-Beta
 
-## AI modes
+## Các chế độ AI
 
-UI hiện có 4 chế độ AI:
+- `minimax`: Minimax chuẩn trong tập nước đi ứng viên gần quân đã đánh. Chế độ này dùng các tối ưu an toàn như cache đánh giá, transposition table, Zobrist hash và kiểm tra thắng quanh nước cuối.
+- `alphabeta`: Alpha-Beta chuẩn trong cùng tập nước đi ứng viên. Move ordering chỉ đổi thứ tự duyệt để cắt tỉa tốt hơn.
+- `minimax-improve`: Minimax có thêm beam pruning / forward pruning động.
+- `alphabeta-improve`: Alpha-Beta có thêm beam pruning / forward pruning động.
 
-- `minimax`: Minimax chuẩn trong tập nước đi ứng viên gần quân đã đánh. Chế độ này vẫn dùng các tối ưu an toàn như cache đánh giá, transposition table, Zobrist hash và kiểm tra thắng quanh nước cuối. Các tối ưu này không cố ý bỏ bớt nhánh hợp lệ trong tập ứng viên.
-- `alphabeta`: Alpha-Beta chuẩn trong cùng tập nước đi ứng viên. Move ordering chỉ đổi thứ tự duyệt để cắt tỉa tốt hơn, không đổi giá trị minimax lý thuyết trong tập ứng viên đó.
-- `minimax-improve`: Minimax có thêm beam pruning / forward pruning động. Chế độ này chỉ duyệt nhóm nước đi được đánh giá hứa hẹn nhất ở mỗi tầng nên nhanh hơn nhiều ở depth cao.
-- `alphabeta-improve`: Alpha-Beta có thêm beam pruning / forward pruning động, ngoài move ordering và transposition table.
+Lưu ý: `*-improve` là chế độ AI thực dụng để chạy depth cao nhanh hơn. Vì beam pruning / forward pruning có thể bỏ qua một số nước hợp lệ, kết quả chọn nước và score có thể khác thuật toán chuẩn.
 
-Lưu ý: `*-improve` là chế độ AI thực dụng để chạy depth 5-8 nhanh hơn. Vì beam pruning / forward pruning có thể bỏ qua một số nước hợp lệ, kết quả chọn nước và score có thể khác với thuật toán chuẩn full-width trong cùng tập ứng viên.
+## AI vs AI
 
-In AI X vs AI O mode, use `Pause` to stop auto-play safely and `Resume`
-to continue. Use `Swap roles`
-to save the current board/log and create two continuation branches:
+Trong AI X vs AI O:
 
-- Branch A keeps the current X/O algorithms.
-- Branch B swaps Minimax and Alpha-Beta between X and O.
+- `Pause`: dừng autoplay an toàn.
+- `Resume`: tiếp tục ván cờ hoặc thêm batch nước mới nếu đã hết giới hạn hiện tại.
+- `Swap roles`: lưu trạng thái hiện tại và tạo hai nhánh tiếp diễn.
+- `Save state`: lưu bàn cờ và log hiện tại.
 
-Set `Next moves after swap` to limit how many additional moves each branch may
-play. If a branch reaches that limit, pressing `Resume` adds another batch of
-that many moves. The UI logs cut-off nodes per turn, for example
-`Turn 14 | Alpha-Beta's nodes: 16352 | Minimax's nodes=17537 | Nodes cut off=1185`,
-and keeps a total above the log. This cut-off panel is shown only when any
-Alpha-Beta mode is compared against any Minimax mode; it is hidden for
-Alpha-Beta vs Alpha-Beta or Minimax vs Minimax.
-If both AI players use exactly the same mode, the UI hides `Swap roles` and
-the secondary branch board because swapping would produce the same session.
-Use `Save state` to save the current board/log without branching. Saved
-boards and logs are written under:
+Cut-off panel chỉ hiện khi một họ Alpha-Beta bất kỳ đối đầu với một họ Minimax bất kỳ. Nếu là Alpha-Beta vs Alpha-Beta hoặc Minimax vs Minimax thì panel này bị ẩn. Nếu hai AI dùng đúng cùng một mode, UI cũng ẩn `Swap roles` và bàn cờ nhánh phụ vì đổi vai sẽ tạo ra cùng một phiên.
+
+Log và snapshot được lưu dưới:
 
 ```text
 source_code/results/sessions/
 ```
 
-## Search performance
+## Tối ưu hiệu suất
 
-The search pipeline uses several optimizations so higher depths stay usable:
+Pipeline hiện có các tối ưu không làm đổi thuật toán tìm kiếm chuẩn:
 
-- Zobrist hash on `Board` for fast transposition table keys.
-- Transposition tables in both Minimax and Alpha-Beta.
-- Winner checks around the last move instead of scanning the whole board at every node.
-- Cached evaluator windows and evaluation results.
-- Tactical move ordering that prioritizes immediate wins, forced blocks, and strong local patterns.
-- Dynamic beam width in `*-improve` modes: depth 5-6 uses a moderate candidate limit, depth 7-8 uses a stricter deep-search beam, and depth 9+ uses an ultra-deep tactical beam.
+- Zobrist hash trên `Board` để tạo key nhanh cho transposition table.
+- `cell_codes` dạng số nguyên phẳng trên `Board` để giảm chi phí truy cập grid.
+- Transposition table cho Minimax và Alpha-Beta.
+- Kiểm tra thắng quanh nước cuối thay vì quét toàn bàn ở mọi node.
+- Cache evaluator theo `(board_hash, ai_player)`.
+- Optional Cython acceleration cho các hot path:
+  - `evaluate_codes`
+  - `check_winner_at_codes`
+  - `check_winner_full_codes`
+  - `quick_move_score_codes`
 
-Because of the beam width, high-depth `*-improve` search is practical forward-pruned search, not a full-width exhaustive tree.
-This keeps depth 5-8 responsive and prevents deeper runs from exploding combinatorially.
+Nếu chưa build Cython extension, code tự fallback về Python implementation.
 
-## Run console game
+## Build Cython acceleration
 
-From the project root:
+Cài dependency:
+
+```bash
+py -m pip install -r requirements.txt
+```
+
+Build extension:
+
+```bash
+py setup_accel.py build_ext --inplace
+```
+
+Trên Windows cần Microsoft C++ Build Tools. Nếu thiếu compiler, lệnh build sẽ báo lỗi `Microsoft Visual C++ 14.0 or greater is required`; khi đó chương trình vẫn chạy fallback Python.
+
+Kiểm tra extension đã được dùng chưa:
+
+```bash
+py -c "import sys; sys.path.insert(0, 'source_code'); from accel import CYTHON_AVAILABLE; print(CYTHON_AVAILABLE)"
+```
+
+Kết quả `True` nghĩa là pipeline đang dùng Cython extension.
+
+## Chạy console
 
 ```bash
 cd source_code
 python main.py --console
 ```
 
-## Run benchmark
+## Chạy benchmark
 
-From the project root:
+Từ thư mục gốc:
 
 ```bash
 python source_code/benchmark/benchmark_runner.py
 ```
 
-The benchmark result will be saved to:
+Kết quả benchmark được ghi vào:
 
 ```text
 source_code/results/benchmark_results.csv
 ```
 
-## Notes for report
+## Ghi chú báo cáo
 
-When comparing Minimax and Alpha-Beta, use:
+Khi so sánh Minimax và Alpha-Beta, cần dùng:
 
-- the same board state,
-- the same search depth,
-- the same evaluator,
-- the same move generator.
+- cùng trạng thái bàn cờ,
+- cùng search depth,
+- cùng evaluator,
+- cùng move generator.
 
-If you use `nearby` candidate move generation, move ordering, or beam width, describe it clearly in the report.
+Nếu dùng `nearby` candidate generation, move ordering, beam width hoặc Cython acceleration, cần mô tả rõ trong báo cáo.

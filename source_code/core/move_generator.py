@@ -1,6 +1,12 @@
-from core.board import Board
+from core.board import Board, PLAYER_CODE
 from core.constants import DIRECTIONS, EMPTY, WIN_LENGTH
 from core.rules import get_opponent
+
+try:
+    from accel import CYTHON_AVAILABLE, quick_move_score_codes
+except ImportError:
+    CYTHON_AVAILABLE = False
+    quick_move_score_codes = None
 
 
 WIN_MOVE_SCORE = 10_000_000
@@ -90,6 +96,17 @@ class MoveGenerator:
 
     def _quick_move_score(self, board: Board, row: int, col: int, player: str) -> int:
         opponent = get_opponent(player)
+        if CYTHON_AVAILABLE and quick_move_score_codes is not None:
+            return quick_move_score_codes(
+                board.cell_codes,
+                board.size,
+                row,
+                col,
+                PLAYER_CODE[player],
+                PLAYER_CODE[opponent],
+                WIN_LENGTH,
+            )
+
         attack_score = self._local_pattern_score(board, row, col, player)
         block_score = self._local_pattern_score(board, row, col, opponent)
 

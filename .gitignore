@@ -3,3 +3,7 @@ __pycache__/
 .venv/
 .env
 source_code/results/*.csv
+build/
+*.pyd
+*.so
+source_code/accel/*.c

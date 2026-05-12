@@ -1,6 +1,12 @@
-from core.board import Board
+from core.board import Board, PLAYER_CODE
 from core.constants import AI, EMPTY, WIN_LENGTH, DIRECTIONS
 from core.rules import get_opponent, get_terminal_score
+
+try:
+    from accel import CYTHON_AVAILABLE, evaluate_codes
+except ImportError:
+    CYTHON_AVAILABLE = False
+    evaluate_codes = None
 
 
 class Evaluator:
@@ -23,6 +29,23 @@ class Evaluator:
             return cached
 
         opponent = get_opponent(ai_player)
+        if CYTHON_AVAILABLE and evaluate_codes is not None:
+            score = evaluate_codes(
+                board.cell_codes,
+                board.size,
+                PLAYER_CODE[ai_player],
+                PLAYER_CODE[opponent],
+                WIN_LENGTH,
+            )
+        else:
+            score = self._evaluate_python(board, ai_player, opponent)
+
+        if len(self.cache) >= self.cache_limit:
+            self.cache.clear()
+        self.cache[cache_key] = score
+        return score
+
+    def _evaluate_python(self, board: Board, ai_player: str, opponent: str) -> int:
         score = 0
         for window in self._get_windows(board.size):
             ai_count = 0
@@ -44,10 +67,6 @@ class Evaluator:
                 score += self._score_counts(ai_count, empty_count)
             elif opponent_count:
                 score -= self._score_counts(opponent_count, empty_count)
-
-        if len(self.cache) >= self.cache_limit:
-            self.cache.clear()
-        self.cache[cache_key] = score
         return score
 
     @classmethod
