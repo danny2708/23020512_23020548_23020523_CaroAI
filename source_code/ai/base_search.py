@@ -16,6 +16,14 @@ class SearchResult:
     player: str
 
 
+@dataclass(slots=True)
+class TranspositionEntry:
+    depth: int
+    score: int
+    flag: str = "EXACT"
+    best_move: Optional[tuple[int, int]] = None
+
+
 class BaseSearch:
     def search(self, board, depth: int, ai_player: str = AI) -> SearchResult:
         raise NotImplementedError

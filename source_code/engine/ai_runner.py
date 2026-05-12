@@ -16,9 +16,26 @@ def normalize_ai_mode(mode: str = "alphabeta") -> str:
     raise ValueError("mode must be '1'/'minimax' or '2'/'alphabeta'")
 
 
-def create_ai(mode: str = "alphabeta", move_mode: str = "nearby", radius: int = 1):
+def create_ai(
+    mode: str = "alphabeta",
+    move_mode: str = "nearby",
+    radius: int = 1,
+    max_candidates: int = 7,
+    root_max_candidates: int = 10,
+    deep_max_candidates: int = 4,
+    very_deep_max_candidates: int = 3,
+    ultra_deep_max_candidates: int = 2,
+):
     evaluator = Evaluator()
-    move_generator = MoveGenerator(mode=move_mode, radius=radius)
+    move_generator = MoveGenerator(
+        mode=move_mode,
+        radius=radius,
+        max_candidates=max_candidates,
+        root_max_candidates=root_max_candidates,
+        deep_max_candidates=deep_max_candidates,
+        very_deep_max_candidates=very_deep_max_candidates,
+        ultra_deep_max_candidates=ultra_deep_max_candidates,
+    )
 
     mode = normalize_ai_mode(mode)
     if mode == "minimax":

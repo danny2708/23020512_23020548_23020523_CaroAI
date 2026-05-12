@@ -15,27 +15,29 @@ Project template for the Caro AI assignment.
 
 ```text
 source_code/
-├── main.py
-├── core/
-│   ├── board.py
-│   ├── constants.py
-│   ├── move_generator.py
-│   └── rules.py
-├── ai/
-│   ├── base_search.py
-│   ├── evaluator.py
-│   ├── minimax.py
-│   └── alpha_beta.py
-├── engine/
-│   ├── ai_runner.py
-│   └── game_engine.py
-├── benchmark/
-│   ├── benchmark_runner.py
-│   ├── result_writer.py
-│   └── test_states.py
-├── ui/
-│   └── console_ui.py
-└── results/
+|-- main.py
+|-- core/
+|   |-- board.py
+|   |-- constants.py
+|   |-- move_generator.py
+|   `-- rules.py
+|-- ai/
+|   |-- base_search.py
+|   |-- evaluator.py
+|   |-- minimax.py
+|   `-- alpha_beta.py
+|-- engine/
+|   |-- ai_runner.py
+|   |-- auto_play.py
+|   `-- game_engine.py
+|-- benchmark/
+|   |-- benchmark_runner.py
+|   |-- result_writer.py
+|   `-- test_states.py
+|-- ui/
+|   |-- console_ui.py
+|   `-- tkinter_ui.py
+`-- results/
 ```
 
 ## Run desktop UI
@@ -72,6 +74,20 @@ boards and logs are written under:
 source_code/results/sessions/
 ```
 
+## Search performance
+
+The search pipeline uses several optimizations so higher depths stay usable:
+
+- Zobrist hash on `Board` for fast transposition table keys.
+- Transposition tables in both Minimax and Alpha-Beta.
+- Winner checks around the last move instead of scanning the whole board at every node.
+- Cached evaluator windows and evaluation results.
+- Tactical move ordering that prioritizes immediate wins, forced blocks, and strong local patterns.
+- Dynamic beam width: depth 5-6 uses a moderate candidate limit, depth 7-8 uses a stricter deep-search beam, and depth 9+ uses an ultra-deep tactical beam.
+
+Because of the beam width, high-depth Minimax is a practical forward-pruned search, not a full-width exhaustive tree.
+This keeps depth 5-6 responsive and prevents depth 8-9 from exploding combinatorially.
+
 ## Run console game
 
 From the project root:
@@ -104,4 +120,4 @@ When comparing Minimax and Alpha-Beta, use:
 - the same evaluator,
 - the same move generator.
 
-If you use `nearby` candidate move generation or move ordering, describe it clearly in the report.
+If you use `nearby` candidate move generation, move ordering, or beam width, describe it clearly in the report.
