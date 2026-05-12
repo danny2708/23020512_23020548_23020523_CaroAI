@@ -18,6 +18,16 @@ from engine.game_engine import GameEngine
 RESULT_PATH = Path(__file__).resolve().parents[1] / "results" / "benchmark_results.csv"
 SESSION_DIR = Path(__file__).resolve().parents[1] / "results" / "sessions"
 
+APP_BG = "#eef2f7"
+PANEL_BG = "#ffffff"
+TEXT_BG = "#f8fafc"
+GRID_LINE = "#d1d5db"
+X_BG = "#dbeafe"
+X_FG = "#1d4ed8"
+O_BG = "#fee2e2"
+O_FG = "#b91c1c"
+EMPTY_BG = "#f9fafb"
+
 
 def format_autoplay_step(step: AutoPlayStep) -> str:
     return (
@@ -28,9 +38,13 @@ def format_autoplay_step(step: AutoPlayStep) -> str:
 
 
 class BoardView(ttk.Frame):
-    def __init__(self, master, on_cell_click=None):
+    def __init__(self, master, on_cell_click=None, cell_width: int = 4, cell_height: int = 2, font_size: int = 11):
         super().__init__(master)
+        self.configure(style="Surface.TFrame")
         self.on_cell_click = on_cell_click
+        self.cell_width = cell_width
+        self.cell_height = cell_height
+        self.font_size = font_size
         self.buttons: list[list[tk.Button]] = []
         self.interactive = False
 
@@ -45,10 +59,15 @@ class BoardView(ttk.Frame):
                 button = tk.Button(
                     self,
                     text="",
-                    width=3,
-                    height=1,
-                    font=("Segoe UI", 11, "bold"),
-                    relief=tk.RIDGE,
+                    width=self.cell_width,
+                    height=self.cell_height,
+                    font=("Segoe UI", self.font_size, "bold"),
+                    relief=tk.FLAT,
+                    bd=0,
+                    highlightthickness=1,
+                    highlightbackground=GRID_LINE,
+                    activebackground="#e0f2fe",
+                    cursor="hand2",
                     command=lambda r=row, c=col: self._handle_click(r, c),
                 )
                 button.grid(row=row, column=col, padx=1, pady=1)
@@ -65,14 +84,14 @@ class BoardView(ttk.Frame):
         for row, values in enumerate(grid):
             for col, value in enumerate(values):
                 text = "" if value == EMPTY else value
-                color = "#f8fafc"
+                color = EMPTY_BG
                 foreground = "#111827"
                 if value == HUMAN:
-                    color = "#dbeafe"
-                    foreground = "#1d4ed8"
+                    color = X_BG
+                    foreground = X_FG
                 elif value == AI:
-                    color = "#fee2e2"
-                    foreground = "#b91c1c"
+                    color = O_BG
+                    foreground = O_FG
 
                 self.buttons[row][col].configure(text=text, bg=color, fg=foreground)
 
@@ -83,14 +102,26 @@ class BoardView(ttk.Frame):
 
 class AutoPlaySessionPane(ttk.LabelFrame):
     def __init__(self, master, title: str):
-        super().__init__(master, text=title, padding=8)
+        super().__init__(master, text=title, padding=10, style="Panel.TLabelframe")
         self.status_var = tk.StringVar(value="No session.")
 
-        self.board_view = BoardView(self)
+        self.board_view = BoardView(self, cell_width=3, cell_height=1, font_size=10)
         self.board_view.pack(anchor=tk.NW)
 
-        ttk.Label(self, textvariable=self.status_var, wraplength=430).pack(anchor=tk.W, pady=(8, 4))
-        self.log = tk.Text(self, width=58, height=15, state=tk.DISABLED)
+        ttk.Label(self, textvariable=self.status_var, wraplength=430, style="PanelMuted.TLabel").pack(anchor=tk.W, pady=(8, 4))
+        self.log = tk.Text(
+            self,
+            width=58,
+            height=10,
+            state=tk.DISABLED,
+            bg=TEXT_BG,
+            fg="#111827",
+            insertbackground="#111827",
+            relief=tk.FLAT,
+            padx=10,
+            pady=8,
+            font=("Consolas", 9),
+        )
         self.log.pack(fill=tk.BOTH, expand=True)
 
     def build(self, size: int) -> None:
@@ -187,7 +218,18 @@ class HumanVsAIFrame(ttk.Frame):
         side_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         ttk.Label(side_panel, textvariable=self.status_var, wraplength=360).pack(anchor=tk.W)
-        self.log = tk.Text(side_panel, width=56, height=22, state=tk.DISABLED)
+        self.log = tk.Text(
+            side_panel,
+            width=56,
+            height=22,
+            state=tk.DISABLED,
+            bg=TEXT_BG,
+            fg="#111827",
+            relief=tk.FLAT,
+            padx=10,
+            pady=8,
+            font=("Consolas", 9),
+        )
         self.log.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
 
     def new_game(self) -> None:
@@ -331,15 +373,18 @@ class AIVsAIFrame(ttk.Frame):
         self.depth_var = tk.StringVar(value="2")
         self.max_turns_var = tk.StringVar(value="81")
         self.branch_moves_var = tk.StringVar(value="4")
+        self.cutoff_var = tk.StringVar(value="Alpha-Beta cut-off nodes: 0")
         self.x_mode_var = tk.StringVar(value="1 - minimax")
         self.o_mode_var = tk.StringVar(value="2 - alphabeta")
         self.status_var = tk.StringVar(value="Create a new AI vs AI game to start.")
+        self.alpha_beta_cutoff_total = 0
+        self.cutoff_lines: list[str] = []
 
         self._build_layout()
         self.new_game()
 
     def _build_layout(self) -> None:
-        controls = ttk.Frame(self)
+        controls = ttk.Frame(self, style="Surface.TFrame")
         controls.pack(fill=tk.X, pady=(0, 10))
 
         ttk.Label(controls, text="Board size").grid(row=0, column=0, sticky=tk.W)
@@ -375,24 +420,43 @@ class AIVsAIFrame(ttk.Frame):
             row=1, column=3, padx=(6, 14), pady=(8, 0)
         )
 
-        ttk.Label(controls, text="Next moves after split").grid(row=1, column=4, sticky=tk.W, pady=(8, 0))
+        ttk.Label(controls, text="Next moves after swap").grid(row=1, column=4, sticky=tk.W, pady=(8, 0))
         ttk.Spinbox(controls, from_=1, to=200, width=7, textvariable=self.branch_moves_var).grid(
             row=1, column=5, padx=(6, 14), pady=(8, 0)
         )
 
-        ttk.Button(controls, text="New game", command=self.new_game).grid(row=2, column=0, pady=(8, 0))
+        ttk.Button(controls, text="New game", command=self.new_game, style="Accent.TButton").grid(row=2, column=0, pady=(10, 0))
         ttk.Button(controls, text="Step", command=self.step_once).grid(row=2, column=1, pady=(8, 0))
         self.run_button = ttk.Button(controls, text="Run all", command=self.toggle_run)
         self.run_button.grid(row=2, column=2, padx=(8, 0), pady=(8, 0))
         ttk.Button(controls, text="Pause", command=self.pause).grid(row=2, column=3, padx=(8, 0), pady=(8, 0))
-        ttk.Button(controls, text="Split roles", command=self.split_roles).grid(
-            row=2, column=4, padx=(8, 0), pady=(8, 0)
-        )
-        ttk.Button(controls, text="Save state", command=self.save_current_state).grid(
+        ttk.Button(controls, text="Resume", command=self.resume).grid(row=2, column=4, padx=(8, 0), pady=(8, 0))
+        ttk.Button(controls, text="Swap roles", command=self.swap_roles).grid(
             row=2, column=5, padx=(8, 0), pady=(8, 0)
         )
+        ttk.Button(controls, text="Save state", command=self.save_current_state).grid(
+            row=2, column=6, padx=(8, 0), pady=(8, 0)
+        )
+        ttk.Label(controls, textvariable=self.cutoff_var, style="Metric.TLabel").grid(
+            row=3, column=0, columnspan=7, padx=(0, 0), pady=(10, 0), sticky=tk.W
+        )
 
-        ttk.Label(self, textvariable=self.status_var, wraplength=980).pack(anchor=tk.W, pady=(0, 8))
+        cutoff_panel = ttk.LabelFrame(self, text="Alpha-Beta cut-off by turn", padding=8, style="Panel.TLabelframe")
+        cutoff_panel.pack(fill=tk.X, pady=(0, 8))
+        self.cutoff_log = tk.Text(
+            cutoff_panel,
+            height=4,
+            state=tk.DISABLED,
+            bg=TEXT_BG,
+            fg="#0f172a",
+            relief=tk.FLAT,
+            padx=10,
+            pady=6,
+            font=("Consolas", 9),
+        )
+        self.cutoff_log.pack(fill=tk.X, expand=True)
+
+        ttk.Label(self, textvariable=self.status_var, wraplength=980, style="Muted.TLabel").pack(anchor=tk.W, pady=(0, 8))
 
         body = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
         body.pack(fill=tk.BOTH, expand=True)
@@ -419,6 +483,10 @@ class AIVsAIFrame(ttk.Frame):
         self.running = False
         self.branch_running = False
         self.run_button.configure(text="Run all")
+        self.alpha_beta_cutoff_total = 0
+        self.cutoff_lines = []
+        self.cutoff_var.set("Alpha-Beta cut-off nodes: 0")
+        self._clear_cutoff_log()
         self.game = AutoPlayGame(
             size=size,
             x_mode=x_mode,
@@ -434,8 +502,8 @@ class AIVsAIFrame(ttk.Frame):
         self.original_pane.load_history(self.game, "Current / original roles")
         self.swapped_pane.clear_log()
         self.swapped_pane.configure(text="Swapped roles branch")
-        self.swapped_pane.status_var.set("Use Split roles to create this branch.")
-        self.status_var.set("Ready. Use Step, Run all, or Split roles.")
+        self.swapped_pane.status_var.set("Use Swap roles to create this branch.")
+        self.status_var.set("Ready. Use Step, Run all, Pause, Resume, or Swap roles.")
 
     def step_once(self) -> None:
         if self.busy or self.running or self.branch_running:
@@ -458,7 +526,6 @@ class AIVsAIFrame(ttk.Frame):
                 self.pause()
             else:
                 self.branch_running = True
-                self.run_button.configure(text="Pause")
                 self._start_branch_step(keep_running=True)
             return
 
@@ -480,18 +547,43 @@ class AIVsAIFrame(ttk.Frame):
             return
 
         self.running = True
-        self.run_button.configure(text="Pause")
         self._start_main_step(keep_running=True)
 
     def pause(self) -> None:
         self.running = False
         self.branch_running = False
-        self.run_button.configure(text="Run all" if self.branch_games is None else "Resume branches")
+        self.run_button.configure(text="Run all")
         self.status_var.set("Paused.")
         if self.branch_games is not None:
             self._save_branch_outputs()
 
-    def split_roles(self) -> None:
+    def resume(self) -> None:
+        if self.busy:
+            return
+
+        if self.branch_games is not None:
+            if not self._has_branch_move_left():
+                self._extend_branch_limits()
+            if self._has_branch_move_left():
+                self.branch_running = True
+                self._start_branch_step(keep_running=True)
+            return
+
+        if self.game is None:
+            return
+
+        if self.game.status() == "ONGOING" and len(self.game.history) >= self.game.max_turns:
+            try:
+                self.game.max_turns += self._read_int(self.branch_moves_var, minimum=1)
+            except ValueError as exc:
+                messagebox.showerror("Invalid input", str(exc))
+                return
+
+        if self.game.status() == "ONGOING":
+            self.running = True
+            self._start_main_step(keep_running=True)
+
+    def swap_roles(self) -> None:
         if self.game is None or self.busy:
             return
 
@@ -499,7 +591,7 @@ class AIVsAIFrame(ttk.Frame):
         if not self._ensure_current_settings():
             return
         if self.game.status() != "ONGOING":
-            self.status_var.set(f"Cannot split: game status is {self.game.status()}.")
+            self.status_var.set(f"Cannot swap: game status is {self.game.status()}.")
             return
 
         try:
@@ -514,13 +606,16 @@ class AIVsAIFrame(ttk.Frame):
         self.branch_status_logged = set()
         self.original_pane.load_history(original, "Branch A: giữ nguyên vai")
         self.swapped_pane.load_history(swapped, "Branch B: đổi Minimax / Alpha-Beta")
-        self.session_dir = self._save_split_snapshot(original, swapped)
+        self.alpha_beta_cutoff_total = 0
+        self.cutoff_lines = []
+        self.cutoff_var.set("Alpha-Beta cut-off nodes: 0")
+        self._clear_cutoff_log()
+        self.session_dir = self._save_swap_snapshot(original, swapped)
         self.status_var.set(
-            f"Split created. Each branch will play at most {additional_turns} more moves. "
+            f"Swap created. Each branch will play at most {additional_turns} more moves. "
             f"Snapshot saved to {self.session_dir}"
         )
         self.branch_running = True
-        self.run_button.configure(text="Pause")
         self._start_branch_step(keep_running=True)
 
     def save_current_state(self) -> None:
@@ -600,8 +695,8 @@ class AIVsAIFrame(ttk.Frame):
 
         if not self._has_branch_move_left():
             self.branch_running = False
-            self.run_button.configure(text="Resume branches")
-            self.status_var.set("Both branches are finished.")
+            self.run_button.configure(text="Run all")
+            self.status_var.set("Both branches reached the current move limit. Use Resume to extend them.")
             self._save_branch_outputs()
             return
 
@@ -633,13 +728,14 @@ class AIVsAIFrame(ttk.Frame):
                 self.branch_status_logged.add(name)
 
         self.busy = False
+        self._update_cutoff_from_updates(updates)
         if keep_running and self.branch_running and self._has_branch_move_left():
             self.after(80, lambda: self._start_branch_step(keep_running=True))
             return
 
         self.branch_running = False
-        self.run_button.configure(text="Resume branches" if self._has_branch_move_left() else "Run all")
-        final_text = "Paused." if self._has_branch_move_left() else "Both branches are finished."
+        self.run_button.configure(text="Run all")
+        final_text = "Paused." if self._has_branch_move_left() else "Both branches reached the current move limit."
         self.status_var.set(final_text)
         self._save_branch_outputs()
 
@@ -648,15 +744,63 @@ class AIVsAIFrame(ttk.Frame):
             return False
         return any(game.status() == "ONGOING" and len(game.history) < game.max_turns for game in self.branch_games.values())
 
+    def _extend_branch_limits(self) -> None:
+        if self.branch_games is None:
+            return
+        try:
+            additional_turns = self._read_int(self.branch_moves_var, minimum=1)
+        except ValueError as exc:
+            messagebox.showerror("Invalid input", str(exc))
+            return
+
+        for game in self.branch_games.values():
+            if game.status() == "ONGOING":
+                game.max_turns = len(game.history) + additional_turns
+        self.branch_status_logged = set()
+        self.status_var.set(f"Resume added {additional_turns} more moves to unfinished branches.")
+
+    def _update_cutoff_from_updates(self, updates) -> None:
+        steps = [step for _, step, _, _ in updates if step is not None]
+        if len(steps) != 2:
+            return
+
+        minimax_step = next((step for step in steps if step.algorithm == "Minimax"), None)
+        alphabeta_step = next((step for step in steps if step.algorithm == "Alpha-Beta"), None)
+        if minimax_step is None or alphabeta_step is None:
+            return
+
+        cut_off = max(0, minimax_step.nodes_visited - alphabeta_step.nodes_visited)
+        self.alpha_beta_cutoff_total += cut_off
+        turn = max(minimax_step.turn, alphabeta_step.turn)
+        line = (
+            f"Turn {turn:02d} | Alpha-Beta's nodes: {alphabeta_step.nodes_visited} | "
+            f"Minimax's nodes={minimax_step.nodes_visited} | "
+            f"Nodes cut off={cut_off}"
+        )
+        self.cutoff_lines.append(line)
+        self._append_cutoff_log(line)
+        self.cutoff_var.set(f"Alpha-Beta cut-off nodes: {self.alpha_beta_cutoff_total}")
+
+    def _append_cutoff_log(self, message: str) -> None:
+        self.cutoff_log.configure(state=tk.NORMAL)
+        self.cutoff_log.insert(tk.END, message + "\n")
+        self.cutoff_log.see(tk.END)
+        self.cutoff_log.configure(state=tk.DISABLED)
+
+    def _clear_cutoff_log(self) -> None:
+        self.cutoff_log.configure(state=tk.NORMAL)
+        self.cutoff_log.delete("1.0", tk.END)
+        self.cutoff_log.configure(state=tk.DISABLED)
+
     def _effective_status(self, game: AutoPlayGame) -> str:
         status = game.status()
         if status == "ONGOING" and len(game.history) >= game.max_turns:
             return "MAX_TURNS_REACHED"
         return status
 
-    def _save_split_snapshot(self, original: AutoPlayGame, swapped: AutoPlayGame) -> Path:
+    def _save_swap_snapshot(self, original: AutoPlayGame, swapped: AutoPlayGame) -> Path:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        session_dir = SESSION_DIR / f"branch_{timestamp}"
+        session_dir = SESSION_DIR / f"swap_{timestamp}"
         session_dir.mkdir(parents=True, exist_ok=True)
 
         base = self.game if self.game is not None else original
@@ -674,6 +818,7 @@ class AIVsAIFrame(ttk.Frame):
                     f"swapped_x_mode={swapped.x_mode}",
                     f"swapped_o_mode={swapped.o_mode}",
                     f"branch_max_turns={original.max_turns}",
+                    f"alpha_beta_cutoff_nodes={self.alpha_beta_cutoff_total}",
                 ]
             ),
             encoding="utf-8",
@@ -687,6 +832,15 @@ class AIVsAIFrame(ttk.Frame):
             return
         self._write_game_files(self.branch_games["original"], self.session_dir, "original_branch")
         self._write_game_files(self.branch_games["swapped"], self.session_dir, "swapped_branch")
+        (self.session_dir / "cutoff_summary.txt").write_text(
+            "\n".join(
+                [
+                    f"alpha_beta_cutoff_nodes_total={self.alpha_beta_cutoff_total}",
+                    *self.cutoff_lines,
+                ]
+            ),
+            encoding="utf-8",
+        )
 
     def _write_game_files(self, game: AutoPlayGame, session_dir: Path, prefix: str) -> None:
         (session_dir / f"{prefix}_board.txt").write_text(game.board.to_ascii(), encoding="utf-8")
@@ -864,19 +1018,48 @@ class CaroApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Caro AI")
-        self.geometry("1120x760")
-        self.minsize(960, 640)
-
-        style = ttk.Style(self)
-        if "clam" in style.theme_names():
-            style.theme_use("clam")
+        self.geometry("1280x820")
+        self.minsize(1100, 700)
+        self.configure(bg=APP_BG)
+        self._configure_style()
 
         notebook = ttk.Notebook(self)
-        notebook.pack(fill=tk.BOTH, expand=True)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=14, pady=14)
 
         notebook.add(HumanVsAIFrame(notebook), text="Human vs AI")
         notebook.add(AIVsAIFrame(notebook), text="AI vs AI")
         notebook.add(BenchmarkFrame(notebook), text="Benchmark")
+
+    def _configure_style(self) -> None:
+        style = ttk.Style(self)
+        if "clam" in style.theme_names():
+            style.theme_use("clam")
+
+        style.configure(".", font=("Segoe UI", 10), background=APP_BG, foreground="#111827")
+        style.configure("TFrame", background=APP_BG)
+        style.configure("Surface.TFrame", background=PANEL_BG)
+        style.configure("TLabel", background=APP_BG, foreground="#111827")
+        style.configure("Muted.TLabel", background=APP_BG, foreground="#475569")
+        style.configure("PanelMuted.TLabel", background=PANEL_BG, foreground="#475569")
+        style.configure("Metric.TLabel", background=APP_BG, foreground="#0f766e", font=("Segoe UI", 10, "bold"))
+        style.configure("TButton", padding=(12, 7), relief="flat", background="#e5e7eb")
+        style.map(
+            "TButton",
+            background=[("active", "#d1d5db"), ("pressed", "#cbd5e1")],
+        )
+        style.configure("Accent.TButton", padding=(14, 8), background="#2563eb", foreground="#ffffff")
+        style.map(
+            "Accent.TButton",
+            background=[("active", "#1d4ed8"), ("pressed", "#1e40af")],
+            foreground=[("active", "#ffffff")],
+        )
+        style.configure("TNotebook", background=APP_BG, borderwidth=0)
+        style.configure("TNotebook.Tab", padding=(14, 8), background="#e5e7eb")
+        style.map("TNotebook.Tab", background=[("selected", PANEL_BG), ("active", "#f8fafc")])
+        style.configure("Panel.TLabelframe", background=PANEL_BG, bordercolor="#d1d5db", relief="solid")
+        style.configure("Panel.TLabelframe.Label", background=PANEL_BG, foreground="#0f172a", font=("Segoe UI", 10, "bold"))
+        style.configure("Treeview", background=TEXT_BG, fieldbackground=TEXT_BG, rowheight=26, borderwidth=0)
+        style.configure("Treeview.Heading", background="#e2e8f0", foreground="#0f172a", font=("Segoe UI", 10, "bold"))
 
 
 def run_gui() -> None:
