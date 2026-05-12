@@ -18,7 +18,7 @@ def run_benchmark(depths=(1, 2, 3), output_path="source_code/results/benchmark_r
 
     for state_name, state_rows in TEST_STATES.items():
         for depth in depths:
-            for mode in ["minimax", "alphabeta"]:
+            for mode in ["minimax", "alphabeta", "minimax-improve", "alphabeta-improve"]:
                 board = Board.from_strings(state_rows)
                 ai = create_ai(mode=mode, move_mode="nearby", radius=1)
                 result = ai.search(board, depth, ai_player=AI)

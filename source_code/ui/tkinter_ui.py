@@ -10,7 +10,7 @@ from benchmark.result_writer import write_results_csv
 from benchmark.test_states import TEST_STATES
 from core.board import Board
 from core.constants import AI, EMPTY, HUMAN
-from engine.ai_runner import create_ai, normalize_ai_mode
+from engine.ai_runner import AI_MODE_OPTIONS, base_algorithm, create_ai, normalize_ai_mode
 from engine.auto_play import AutoPlayGame, AutoPlayStep
 from engine.game_engine import GameEngine
 
@@ -177,7 +177,7 @@ class HumanVsAIFrame(ttk.Frame):
 
         self.size_var = tk.StringVar(value="9")
         self.depth_var = tk.StringVar(value="2")
-        self.mode_var = tk.StringVar(value="2 - alphabeta")
+        self.mode_var = tk.StringVar(value="4 - alphabeta-improve")
         self.status_var = tk.StringVar(value="Create a new game to start.")
 
         self._build_layout()
@@ -195,14 +195,14 @@ class HumanVsAIFrame(ttk.Frame):
         ttk.Label(controls, text="AI mode").grid(row=0, column=2, sticky=tk.W)
         ttk.Combobox(
             controls,
-            width=16,
+            width=22,
             textvariable=self.mode_var,
-            values=("1 - minimax", "2 - alphabeta"),
+            values=AI_MODE_OPTIONS,
             state="readonly",
         ).grid(row=0, column=3, padx=(6, 16))
 
         ttk.Label(controls, text="Depth").grid(row=0, column=4, sticky=tk.W)
-        ttk.Spinbox(controls, from_=1, to=5, width=6, textvariable=self.depth_var).grid(
+        ttk.Spinbox(controls, from_=1, to=8, width=6, textvariable=self.depth_var).grid(
             row=0, column=5, padx=(6, 16)
         )
 
@@ -235,7 +235,7 @@ class HumanVsAIFrame(ttk.Frame):
     def new_game(self) -> None:
         try:
             size = self._read_int(self.size_var, minimum=9)
-            depth = self._read_int(self.depth_var, minimum=1)
+            depth = self._read_int(self.depth_var, minimum=1, maximum=8)
             mode = self._mode_from_var(self.mode_var)
         except ValueError as exc:
             messagebox.showerror("Invalid input", str(exc))
@@ -321,13 +321,15 @@ class HumanVsAIFrame(ttk.Frame):
         self.log.delete("1.0", tk.END)
         self.log.configure(state=tk.DISABLED)
 
-    def _read_int(self, var: tk.StringVar, minimum: int) -> int:
+    def _read_int(self, var: tk.StringVar, minimum: int, maximum: int | None = None) -> int:
         try:
             value = int(var.get())
         except ValueError as exc:
             raise ValueError("Please enter a valid integer.") from exc
         if value < minimum:
             raise ValueError(f"Value must be at least {minimum}.")
+        if maximum is not None and value > maximum:
+            raise ValueError(f"Value must be at most {maximum}.")
         return value
 
     def _mode_from_var(self, var: tk.StringVar) -> str:
@@ -335,7 +337,7 @@ class HumanVsAIFrame(ttk.Frame):
 
     def _settings_from_controls(self) -> tuple[int, str, int]:
         size = self._read_int(self.size_var, minimum=9)
-        depth = self._read_int(self.depth_var, minimum=1)
+        depth = self._read_int(self.depth_var, minimum=1, maximum=8)
         mode = self._mode_from_var(self.mode_var)
         return size, mode, depth
 
@@ -374,11 +376,12 @@ class AIVsAIFrame(ttk.Frame):
         self.max_turns_var = tk.StringVar(value="81")
         self.branch_moves_var = tk.StringVar(value="4")
         self.cutoff_var = tk.StringVar(value="Alpha-Beta cut-off nodes: 0")
-        self.x_mode_var = tk.StringVar(value="1 - minimax")
-        self.o_mode_var = tk.StringVar(value="2 - alphabeta")
+        self.x_mode_var = tk.StringVar(value="3 - minimax-improve")
+        self.o_mode_var = tk.StringVar(value="4 - alphabeta-improve")
         self.status_var = tk.StringVar(value="Create a new AI vs AI game to start.")
         self.alpha_beta_cutoff_total = 0
         self.cutoff_lines: list[str] = []
+        self.cutoff_comparison_enabled = False
 
         self._build_layout()
         self.new_game()
@@ -393,25 +396,29 @@ class AIVsAIFrame(ttk.Frame):
         )
 
         ttk.Label(controls, text="X AI").grid(row=0, column=2, sticky=tk.W)
-        ttk.Combobox(
+        self.x_mode_combo = ttk.Combobox(
             controls,
-            width=16,
+            width=22,
             textvariable=self.x_mode_var,
-            values=("1 - minimax", "2 - alphabeta"),
+            values=AI_MODE_OPTIONS,
             state="readonly",
-        ).grid(row=0, column=3, padx=(6, 14))
+        )
+        self.x_mode_combo.grid(row=0, column=3, padx=(6, 14))
+        self.x_mode_combo.bind("<<ComboboxSelected>>", self._refresh_branch_ui_from_controls)
 
         ttk.Label(controls, text="O AI").grid(row=0, column=4, sticky=tk.W)
-        ttk.Combobox(
+        self.o_mode_combo = ttk.Combobox(
             controls,
-            width=16,
+            width=22,
             textvariable=self.o_mode_var,
-            values=("1 - minimax", "2 - alphabeta"),
+            values=AI_MODE_OPTIONS,
             state="readonly",
-        ).grid(row=0, column=5, padx=(6, 14))
+        )
+        self.o_mode_combo.grid(row=0, column=5, padx=(6, 14))
+        self.o_mode_combo.bind("<<ComboboxSelected>>", self._refresh_branch_ui_from_controls)
 
         ttk.Label(controls, text="Depth").grid(row=1, column=0, sticky=tk.W, pady=(8, 0))
-        ttk.Spinbox(controls, from_=1, to=5, width=6, textvariable=self.depth_var).grid(
+        ttk.Spinbox(controls, from_=1, to=8, width=6, textvariable=self.depth_var).grid(
             row=1, column=1, padx=(6, 14), pady=(8, 0)
         )
 
@@ -431,20 +438,28 @@ class AIVsAIFrame(ttk.Frame):
         self.run_button.grid(row=2, column=2, padx=(8, 0), pady=(8, 0))
         ttk.Button(controls, text="Pause", command=self.pause).grid(row=2, column=3, padx=(8, 0), pady=(8, 0))
         ttk.Button(controls, text="Resume", command=self.resume).grid(row=2, column=4, padx=(8, 0), pady=(8, 0))
-        ttk.Button(controls, text="Swap roles", command=self.swap_roles).grid(
+        self.swap_button = ttk.Button(controls, text="Swap roles", command=self.swap_roles)
+        self.swap_button.grid(
             row=2, column=5, padx=(8, 0), pady=(8, 0)
         )
         ttk.Button(controls, text="Save state", command=self.save_current_state).grid(
             row=2, column=6, padx=(8, 0), pady=(8, 0)
         )
-        ttk.Label(controls, textvariable=self.cutoff_var, style="Metric.TLabel").grid(
+        self.cutoff_label = ttk.Label(controls, textvariable=self.cutoff_var, style="Metric.TLabel")
+        self.cutoff_label.grid(
             row=3, column=0, columnspan=7, padx=(0, 0), pady=(10, 0), sticky=tk.W
         )
 
-        cutoff_panel = ttk.LabelFrame(self, text="Alpha-Beta cut-off by turn", padding=8, style="Panel.TLabelframe")
-        cutoff_panel.pack(fill=tk.X, pady=(0, 8))
+        self.cutoff_container = ttk.Frame(self, style="Surface.TFrame")
+        self.cutoff_panel = ttk.LabelFrame(
+            self.cutoff_container,
+            text="Alpha-Beta cut-off by turn",
+            padding=8,
+            style="Panel.TLabelframe",
+        )
+        self.cutoff_panel.pack(fill=tk.X)
         self.cutoff_log = tk.Text(
-            cutoff_panel,
+            self.cutoff_panel,
             height=4,
             state=tk.DISABLED,
             bg=TEXT_BG,
@@ -456,15 +471,17 @@ class AIVsAIFrame(ttk.Frame):
         )
         self.cutoff_log.pack(fill=tk.X, expand=True)
 
-        ttk.Label(self, textvariable=self.status_var, wraplength=980, style="Muted.TLabel").pack(anchor=tk.W, pady=(0, 8))
+        self.status_label = ttk.Label(self, textvariable=self.status_var, wraplength=980, style="Muted.TLabel")
+        self.status_label.pack(anchor=tk.W, pady=(0, 8))
 
-        body = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
-        body.pack(fill=tk.BOTH, expand=True)
+        self.body = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
+        self.body.pack(fill=tk.BOTH, expand=True)
 
-        self.original_pane = AutoPlaySessionPane(body, "Current / original roles")
-        self.swapped_pane = AutoPlaySessionPane(body, "Swapped roles branch")
-        body.add(self.original_pane, weight=1)
-        body.add(self.swapped_pane, weight=1)
+        self.original_pane = AutoPlaySessionPane(self.body, "Current / original roles")
+        self.swapped_pane = AutoPlaySessionPane(self.body, "Swapped roles branch")
+        self.body.add(self.original_pane, weight=1)
+        self.body.add(self.swapped_pane, weight=1)
+        self._set_cutoff_visibility(False)
 
     def new_game(self) -> None:
         if self.busy:
@@ -472,7 +489,7 @@ class AIVsAIFrame(ttk.Frame):
 
         try:
             size = self._read_int(self.size_var, minimum=9)
-            depth = self._read_int(self.depth_var, minimum=1)
+            depth = self._read_int(self.depth_var, minimum=1, maximum=8)
             max_turns = self._read_int(self.max_turns_var, minimum=1)
             x_mode = self._mode_from_var(self.x_mode_var)
             o_mode = self._mode_from_var(self.o_mode_var)
@@ -487,6 +504,8 @@ class AIVsAIFrame(ttk.Frame):
         self.cutoff_lines = []
         self.cutoff_var.set("Alpha-Beta cut-off nodes: 0")
         self._clear_cutoff_log()
+        self._set_branch_controls_visibility(self._should_enable_swap_for_modes(x_mode, o_mode))
+        self._set_cutoff_visibility(self._should_show_cutoff_for_modes(x_mode, o_mode))
         self.game = AutoPlayGame(
             size=size,
             x_mode=x_mode,
@@ -503,7 +522,10 @@ class AIVsAIFrame(ttk.Frame):
         self.swapped_pane.clear_log()
         self.swapped_pane.configure(text="Swapped roles branch")
         self.swapped_pane.status_var.set("Use Swap roles to create this branch.")
-        self.status_var.set("Ready. Use Step, Run all, Pause, Resume, or Swap roles.")
+        if self._should_enable_swap_for_modes(x_mode, o_mode):
+            self.status_var.set("Ready. Use Step, Run all, Pause, Resume, or Swap roles.")
+        else:
+            self.status_var.set("Ready. Same AI mode on both sides, so Swap roles is hidden.")
 
     def step_once(self) -> None:
         if self.busy or self.running or self.branch_running:
@@ -593,6 +615,10 @@ class AIVsAIFrame(ttk.Frame):
         if self.game.status() != "ONGOING":
             self.status_var.set(f"Cannot swap: game status is {self.game.status()}.")
             return
+        if not self._should_enable_swap_for_modes(self.game.x_mode, self.game.o_mode):
+            self.status_var.set("Swap roles is hidden because both AI players use the same mode.")
+            self._set_branch_controls_visibility(False)
+            return
 
         try:
             additional_turns = self._read_int(self.branch_moves_var, minimum=1)
@@ -610,6 +636,7 @@ class AIVsAIFrame(ttk.Frame):
         self.cutoff_lines = []
         self.cutoff_var.set("Alpha-Beta cut-off nodes: 0")
         self._clear_cutoff_log()
+        self._set_cutoff_visibility(self._should_show_cutoff_for_modes(original.x_mode, original.o_mode))
         self.session_dir = self._save_swap_snapshot(original, swapped)
         self.status_var.set(
             f"Swap created. Each branch will play at most {additional_turns} more moves. "
@@ -760,12 +787,15 @@ class AIVsAIFrame(ttk.Frame):
         self.status_var.set(f"Resume added {additional_turns} more moves to unfinished branches.")
 
     def _update_cutoff_from_updates(self, updates) -> None:
+        if not self.cutoff_comparison_enabled:
+            return
+
         steps = [step for _, step, _, _ in updates if step is not None]
         if len(steps) != 2:
             return
 
-        minimax_step = next((step for step in steps if step.algorithm == "Minimax"), None)
-        alphabeta_step = next((step for step in steps if step.algorithm == "Alpha-Beta"), None)
+        minimax_step = next((step for step in steps if step.algorithm.startswith("Minimax")), None)
+        alphabeta_step = next((step for step in steps if step.algorithm.startswith("Alpha-Beta")), None)
         if minimax_step is None or alphabeta_step is None:
             return
 
@@ -773,13 +803,59 @@ class AIVsAIFrame(ttk.Frame):
         self.alpha_beta_cutoff_total += cut_off
         turn = max(minimax_step.turn, alphabeta_step.turn)
         line = (
-            f"Turn {turn:02d} | Alpha-Beta's nodes: {alphabeta_step.nodes_visited} | "
-            f"Minimax's nodes={minimax_step.nodes_visited} | "
+            f"Turn {turn:02d} | {alphabeta_step.algorithm}'s nodes: {alphabeta_step.nodes_visited} | "
+            f"{minimax_step.algorithm}'s nodes={minimax_step.nodes_visited} | "
             f"Nodes cut off={cut_off}"
         )
         self.cutoff_lines.append(line)
         self._append_cutoff_log(line)
         self.cutoff_var.set(f"Alpha-Beta cut-off nodes: {self.alpha_beta_cutoff_total}")
+
+    def _should_show_cutoff_for_modes(self, x_mode: str, o_mode: str) -> bool:
+        return {base_algorithm(x_mode), base_algorithm(o_mode)} == {"minimax", "alphabeta"}
+
+    def _should_enable_swap_for_modes(self, x_mode: str, o_mode: str) -> bool:
+        return normalize_ai_mode(x_mode) != normalize_ai_mode(o_mode)
+
+    def _refresh_branch_ui_from_controls(self, *_args) -> None:
+        try:
+            x_mode = self._mode_from_var(self.x_mode_var)
+            o_mode = self._mode_from_var(self.o_mode_var)
+        except ValueError:
+            return
+
+        self._set_branch_controls_visibility(self._should_enable_swap_for_modes(x_mode, o_mode))
+
+    def _set_branch_controls_visibility(self, visible: bool) -> None:
+        if visible:
+            self.swap_button.grid()
+            self._set_swapped_pane_visibility(True)
+            return
+
+        self.swap_button.grid_remove()
+        if self.branch_games is None:
+            self._set_swapped_pane_visibility(False)
+
+    def _set_swapped_pane_visibility(self, visible: bool) -> None:
+        pane_id = str(self.swapped_pane)
+        pane_ids = set(self.body.panes())
+        if visible and pane_id not in pane_ids:
+            self.body.add(self.swapped_pane, weight=1)
+            return
+        if not visible and pane_id in pane_ids:
+            self.body.forget(self.swapped_pane)
+
+    def _set_cutoff_visibility(self, visible: bool) -> None:
+        self.cutoff_comparison_enabled = visible
+        if visible:
+            self.cutoff_label.grid()
+            if not self.cutoff_container.winfo_manager():
+                self.cutoff_container.pack(fill=tk.X, pady=(0, 8), before=self.status_label)
+            return
+
+        self.cutoff_label.grid_remove()
+        if self.cutoff_container.winfo_manager():
+            self.cutoff_container.pack_forget()
 
     def _append_cutoff_log(self, message: str) -> None:
         self.cutoff_log.configure(state=tk.NORMAL)
@@ -832,15 +908,16 @@ class AIVsAIFrame(ttk.Frame):
             return
         self._write_game_files(self.branch_games["original"], self.session_dir, "original_branch")
         self._write_game_files(self.branch_games["swapped"], self.session_dir, "swapped_branch")
-        (self.session_dir / "cutoff_summary.txt").write_text(
-            "\n".join(
-                [
-                    f"alpha_beta_cutoff_nodes_total={self.alpha_beta_cutoff_total}",
-                    *self.cutoff_lines,
-                ]
-            ),
-            encoding="utf-8",
-        )
+        if self.cutoff_comparison_enabled:
+            (self.session_dir / "cutoff_summary.txt").write_text(
+                "\n".join(
+                    [
+                        f"alpha_beta_cutoff_nodes_total={self.alpha_beta_cutoff_total}",
+                        *self.cutoff_lines,
+                    ]
+                ),
+                encoding="utf-8",
+            )
 
     def _write_game_files(self, game: AutoPlayGame, session_dir: Path, prefix: str) -> None:
         (session_dir / f"{prefix}_board.txt").write_text(game.board.to_ascii(), encoding="utf-8")
@@ -860,13 +937,15 @@ class AIVsAIFrame(ttk.Frame):
         lines.extend(format_autoplay_step(step) for step in game.history)
         return "\n".join(lines)
 
-    def _read_int(self, var: tk.StringVar, minimum: int) -> int:
+    def _read_int(self, var: tk.StringVar, minimum: int, maximum: int | None = None) -> int:
         try:
             value = int(var.get())
         except ValueError as exc:
             raise ValueError("Please enter a valid integer.") from exc
         if value < minimum:
             raise ValueError(f"Value must be at least {minimum}.")
+        if maximum is not None and value > maximum:
+            raise ValueError(f"Value must be at most {maximum}.")
         return value
 
     def _mode_from_var(self, var: tk.StringVar) -> str:
@@ -874,7 +953,7 @@ class AIVsAIFrame(ttk.Frame):
 
     def _settings_from_controls(self) -> tuple[int, str, str, int, int]:
         size = self._read_int(self.size_var, minimum=9)
-        depth = self._read_int(self.depth_var, minimum=1)
+        depth = self._read_int(self.depth_var, minimum=1, maximum=8)
         max_turns = self._read_int(self.max_turns_var, minimum=1)
         x_mode = self._mode_from_var(self.x_mode_var)
         o_mode = self._mode_from_var(self.o_mode_var)
@@ -931,6 +1010,7 @@ class BenchmarkFrame(ttk.Frame):
             self.table.heading(column, text=column)
             self.table.column(column, width=120, anchor=tk.CENTER)
         self.table.column("state", width=190, anchor=tk.W)
+        self.table.column("algorithm", width=170, anchor=tk.CENTER)
         self.table.pack(fill=tk.BOTH, expand=True)
 
     def run_benchmark(self) -> None:
@@ -953,7 +1033,7 @@ class BenchmarkFrame(ttk.Frame):
         rows = []
         for state_name, state_rows in TEST_STATES.items():
             for depth in depths:
-                for mode in ("minimax", "alphabeta"):
+                for mode in ("minimax", "alphabeta", "minimax-improve", "alphabeta-improve"):
                     board = Board.from_strings(state_rows)
                     ai = create_ai(mode=mode, move_mode="nearby", radius=1)
                     result = ai.search(board, depth, ai_player=AI)

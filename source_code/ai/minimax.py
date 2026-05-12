@@ -7,12 +7,19 @@ from core.rules import get_opponent, get_terminal_score
 
 
 class MinimaxSearch(BaseSearch):
-    def __init__(self, evaluator, move_generator, table_limit: int = 250_000):
+    def __init__(
+        self,
+        evaluator,
+        move_generator,
+        table_limit: int = 250_000,
+        algorithm_name: str = "Minimax",
+    ):
         self.evaluator = evaluator
         self.move_generator = move_generator
         self.nodes_visited = 0
         self.table_limit = table_limit
         self.transposition_table: dict[tuple[int, int, str, str], TranspositionEntry] = {}
+        self.algorithm_name = algorithm_name
 
     def search(self, board, depth: int, ai_player: str = AI) -> SearchResult:
         self.nodes_visited = 0
@@ -22,7 +29,7 @@ class MinimaxSearch(BaseSearch):
         terminal_score = get_terminal_score(board, ai_player)
         if terminal_score is not None:
             elapsed = time.perf_counter() - start
-            return SearchResult(None, terminal_score, depth, 0, elapsed, "Minimax", ai_player)
+            return SearchResult(None, terminal_score, depth, 0, elapsed, self.algorithm_name, ai_player)
 
         best_score = -math.inf
         best_move = None
@@ -61,7 +68,7 @@ class MinimaxSearch(BaseSearch):
             depth,
             self.nodes_visited,
             elapsed,
-            "Minimax",
+            self.algorithm_name,
             ai_player,
         )
 

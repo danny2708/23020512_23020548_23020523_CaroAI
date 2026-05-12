@@ -1,0 +1,15 @@
+X=alphabeta
+O=alphabeta
+depth=6
+current_player=O
+turns=7
+max_turns=7
+total_nodes=86185
+total_time=8.493692
+Turn 01 | Player X | Alpha-Beta | move=(4, 4) | score=-310 | depth=6 | nodes=7212 | time=0.620390s
+Turn 02 | Player O | Alpha-Beta | move=(5, 5) | score=-1590 | depth=6 | nodes=21465 | time=1.926498s
+Turn 03 | Player X | Alpha-Beta | move=(4, 6) | score=-260 | depth=6 | nodes=12606 | time=1.134319s
+Turn 04 | Player O | Alpha-Beta | move=(4, 5) | score=-2040 | depth=6 | nodes=7953 | time=0.734204s
+Turn 05 | Player X | Alpha-Beta | move=(3, 5) | score=-50 | depth=6 | nodes=8302 | time=0.816651s
+Turn 06 | Player O | Alpha-Beta | move=(2, 4) | score=-100000 | depth=6 | nodes=12777 | time=1.087180s
+Turn 07 | Player X | Alpha-Beta | move=(5, 3) | score=100000 | depth=6 | nodes=15870 | time=2.174449s

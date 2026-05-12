@@ -27,7 +27,7 @@ def read_ai_mode(prompt: str, default: str) -> str:
         try:
             return normalize_ai_mode(raw_mode)
         except ValueError:
-            print("Invalid AI mode. Enter 1/minimax or 2/alphabeta.")
+            print("Invalid AI mode. Enter 1/minimax, 2/alphabeta, 3/minimax-improve, or 4/alphabeta-improve.")
 
 
 def run_console_game():
@@ -45,7 +45,7 @@ def run_console_game():
 def run_human_vs_ai_game():
     print("=== Human X vs AI O ===")
     size = read_int("Board size, minimum 9 [default 9]: ", default=9, minimum=9)
-    mode = read_ai_mode("AI mode: 1=minimax / 2=alphabeta [default 2]: ", default="2")
+    mode = read_ai_mode("AI mode: 1=minimax / 2=alphabeta / 3=minimax-improve / 4=alphabeta-improve [default 4]: ", default="4")
     depth = read_int("Search depth [default 2]: ", default=2, minimum=1)
 
     game = GameEngine(size=size, ai_mode=mode, depth=depth)
@@ -81,8 +81,8 @@ def run_human_vs_ai_game():
 def run_ai_vs_ai_game():
     print("=== AI X vs AI O ===")
     size = read_int("Board size, minimum 9 [default 9]: ", default=9, minimum=9)
-    x_mode = read_ai_mode("X algorithm: 1=minimax / 2=alphabeta [default 1]: ", default="1")
-    o_mode = read_ai_mode("O algorithm: 1=minimax / 2=alphabeta [default 2]: ", default="2")
+    x_mode = read_ai_mode("X algorithm: 1=minimax / 2=alphabeta / 3=minimax-improve / 4=alphabeta-improve [default 3]: ", default="3")
+    o_mode = read_ai_mode("O algorithm: 1=minimax / 2=alphabeta / 3=minimax-improve / 4=alphabeta-improve [default 4]: ", default="4")
     depth = read_int("Search depth for both AIs [default 2]: ", default=2, minimum=1)
     max_turns = read_int(
         "Max turns [default board size * board size]: ",
