@@ -1,0 +1,10 @@
+X=minimax
+O=alphabeta
+depth=4
+current_player=X
+turns=2
+max_turns=81
+total_nodes=3068
+total_time=2.207588
+Turn 01 | Player X | Minimax | move=(4, 4) | score=-100 | depth=4 | nodes=1297 | time=1.049497s
+Turn 02 | Player O | Alpha-Beta | move=(5, 5) | score=-970 | depth=4 | nodes=1771 | time=1.158091s

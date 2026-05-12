@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from core.board import Board
 from core.constants import AI, HUMAN
 from core.rules import check_winner, check_draw
-from engine.ai_runner import create_ai
+from engine.ai_runner import create_ai, normalize_ai_mode
 from ai.base_search import SearchResult
 
 
@@ -34,8 +34,10 @@ class AutoPlayGame:
         max_turns: int | None = None,
     ):
         self.board = Board(size=size)
-        self.x_ai = create_ai(x_mode)
-        self.o_ai = create_ai(o_mode)
+        self.x_mode = normalize_ai_mode(x_mode)
+        self.o_mode = normalize_ai_mode(o_mode)
+        self.x_ai = create_ai(self.x_mode)
+        self.o_ai = create_ai(self.o_mode)
         self.depth = depth
         self.max_turns = max_turns or size * size
         self.history: list[AutoPlayStep] = []
@@ -102,3 +104,30 @@ class AutoPlayGame:
         if player == AI:
             return self.o_ai.search(search_board, self.depth, ai_player=AI)
         return self.x_ai.search(search_board, self.depth, ai_player=HUMAN)
+
+    @property
+    def total_nodes_visited(self) -> int:
+        return sum(step.nodes_visited for step in self.history)
+
+    @property
+    def total_elapsed_time(self) -> float:
+        return sum(step.elapsed_time for step in self.history)
+
+    def clone_branch(self, swap_algorithms: bool = False, additional_turns: int | None = None) -> "AutoPlayGame":
+        x_mode = self.o_mode if swap_algorithms else self.x_mode
+        o_mode = self.x_mode if swap_algorithms else self.o_mode
+        max_turns = self.max_turns
+        if additional_turns is not None:
+            max_turns = len(self.history) + additional_turns
+
+        branch = AutoPlayGame(
+            size=self.board.size,
+            x_mode=x_mode,
+            o_mode=o_mode,
+            depth=self.depth,
+            max_turns=max_turns,
+        )
+        branch.board = self.board.clone()
+        branch.history = list(self.history)
+        branch.current_player = self.current_player
+        return branch

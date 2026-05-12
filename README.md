@@ -53,6 +53,20 @@ The UI includes:
 - AI X vs AI O
 - Benchmark Minimax vs Alpha-Beta
 
+In AI X vs AI O mode, use `Pause` to stop auto-play safely. Use `Split roles`
+to save the current board/log and create two continuation branches:
+
+- Branch A keeps the current X/O algorithms.
+- Branch B swaps Minimax and Alpha-Beta between X and O.
+
+Set `Next moves after split` to limit how many additional moves each branch may
+play. Use `Save state` to save the current board/log without branching. Saved
+boards and logs are written under:
+
+```text
+source_code/results/sessions/
+```
+
 ## Run console game
 
 From the project root:

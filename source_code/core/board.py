@@ -57,7 +57,14 @@ class Board:
     def is_full(self) -> bool:
         return all(self.grid[r][c] != EMPTY for r in range(self.size) for c in range(self.size))
 
+    def to_strings(self) -> list[str]:
+        return ["".join(row) for row in self.grid]
+
+    def to_ascii(self) -> str:
+        lines = ["   " + " ".join(f"{i:2d}" for i in range(self.size))]
+        for row_index, row in enumerate(self.grid):
+            lines.append(f"{row_index:2d} " + "  ".join(row))
+        return "\n".join(lines)
+
     def print_board(self) -> None:
-        print("   " + " ".join(f"{i:2d}" for i in range(self.size)))
-        for i, row in enumerate(self.grid):
-            print(f"{i:2d} " + "  ".join(row))
+        print(self.to_ascii())
