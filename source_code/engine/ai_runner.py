@@ -4,13 +4,25 @@ from ai.alpha_beta import AlphaBetaSearch
 from core.move_generator import MoveGenerator
 
 
+def normalize_ai_mode(mode: str = "alphabeta") -> str:
+    raw_mode = (mode or "alphabeta").strip().lower()
+    compact_mode = raw_mode.replace("-", "").replace("_", "").replace(" ", "")
+
+    if raw_mode == "1" or compact_mode in {"minimax", "mini", "level1"}:
+        return "minimax"
+    if raw_mode == "2" or compact_mode in {"alphabeta", "ab", "level2"}:
+        return "alphabeta"
+
+    raise ValueError("mode must be '1'/'minimax' or '2'/'alphabeta'")
+
+
 def create_ai(mode: str = "alphabeta", move_mode: str = "nearby", radius: int = 1):
     evaluator = Evaluator()
     move_generator = MoveGenerator(mode=move_mode, radius=radius)
 
-    mode = mode.lower()
-    if mode in {"minimax", "level1"}:
+    mode = normalize_ai_mode(mode)
+    if mode == "minimax":
         return MinimaxSearch(evaluator, move_generator)
-    if mode in {"alphabeta", "alpha-beta", "level2"}:
+    if mode == "alphabeta":
         return AlphaBetaSearch(evaluator, move_generator)
-    raise ValueError("mode must be 'minimax' or 'alphabeta'")
+    raise ValueError("mode must be '1'/'minimax' or '2'/'alphabeta'")

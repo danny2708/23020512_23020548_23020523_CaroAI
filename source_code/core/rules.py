@@ -26,10 +26,15 @@ def check_draw(board: Board) -> bool:
     return board.is_full() and not check_winner(board, AI) and not check_winner(board, HUMAN)
 
 
-def get_terminal_score(board: Board) -> int | None:
-    if check_winner(board, AI):
+def get_opponent(player: str) -> str:
+    return HUMAN if player == AI else AI
+
+
+def get_terminal_score(board: Board, ai_player: str = AI) -> int | None:
+    opponent = get_opponent(ai_player)
+    if check_winner(board, ai_player):
         return 100_000
-    if check_winner(board, HUMAN):
+    if check_winner(board, opponent):
         return -100_000
     if check_draw(board):
         return 0

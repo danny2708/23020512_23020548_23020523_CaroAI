@@ -14,7 +14,8 @@ class GameEngine:
         return self.board.place_move(row, col, HUMAN)
 
     def ai_move(self):
-        result = self.ai.search(self.board, self.depth)
+        search_board = self.board.clone()
+        result = self.ai.search(search_board, self.depth, ai_player=AI)
         if result.best_move is not None:
             self.board.place_move(result.best_move[0], result.best_move[1], AI)
         return result

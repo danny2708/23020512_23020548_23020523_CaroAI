@@ -38,13 +38,28 @@ source_code/
 └── results/
 ```
 
-## Run console game
+## Run desktop UI
 
 From the project root:
 
 ```bash
 cd source_code
 python main.py
+```
+
+The UI includes:
+
+- Human X vs AI O
+- AI X vs AI O
+- Benchmark Minimax vs Alpha-Beta
+
+## Run console game
+
+From the project root:
+
+```bash
+cd source_code
+python main.py --console
 ```
 
 ## Run benchmark

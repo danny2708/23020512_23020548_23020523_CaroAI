@@ -6,8 +6,10 @@ def write_results_csv(results: list[dict], output_path: str):
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
         "state",
+        "board_size",
         "depth",
         "algorithm",
+        "ai_player",
         "best_move",
         "score",
         "nodes_visited",
