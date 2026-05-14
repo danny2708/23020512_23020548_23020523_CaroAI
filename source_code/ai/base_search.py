@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from core.constants import AI
@@ -14,6 +14,7 @@ class SearchResult:
     elapsed_time: float
     algorithm: str
     player: str
+    pruning_events: list[dict] = field(default_factory=list)
 
 
 @dataclass(slots=True)

@@ -148,8 +148,22 @@ python source_code/benchmark/benchmark_runner.py
 Kết quả benchmark được ghi vào:
 
 ```text
-source_code/results/benchmark_results.csv
+source_code/results/benchmark_summary.csv
+source_code/results/pruning_details.csv
+source_code/results/eval_heuristic_log.csv
 ```
+
+`benchmark_summary.csv` chứa kết quả tổng quan theo từng `Test_ID`, thế cờ, thuật toán, depth,
+nước đi tốt nhất, điểm heuristic, số node đã duyệt, thời gian chạy và trạng thái có nhìn thấy
+thắng/thua hay không.
+Các tọa độ `*_X` là chỉ số cột và `*_Y` là chỉ số hàng, đều bắt đầu từ `0`.
+
+`pruning_details.csv` chỉ có dữ liệu từ Alpha-Beta, ghi lại độ sâu cắt nhánh, alpha/beta tại thời
+điểm cắt, ước lượng số node được bỏ qua và thứ tự timestamp.
+
+`eval_heuristic_log.csv` ghi breakdown heuristic cho các nước ứng viên ở root: điểm tấn công,
+điểm phòng thủ, trọng số vị trí và điểm cuối cùng. Hiện tại `Position_Weight` được để `0` vì
+evaluator chính của pipeline đang dựa trên mẫu quân công/thủ, chưa cộng điểm vị trí vào score.
 
 ## Ghi chú báo cáo
 

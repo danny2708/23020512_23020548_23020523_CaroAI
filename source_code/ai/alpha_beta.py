@@ -20,16 +20,20 @@ class AlphaBetaSearch(BaseSearch):
         self.table_limit = table_limit
         self.transposition_table: dict[tuple[int, str, str], TranspositionEntry] = {}
         self.algorithm_name = algorithm_name
+        self.pruning_events: list[dict] = []
+        self._prune_timestamp = 0
 
     def search(self, board, depth: int, ai_player: str = AI) -> SearchResult:
         self.nodes_visited = 0
+        self.pruning_events = []
+        self._prune_timestamp = 0
         depth = max(1, depth)
         start = time.perf_counter()
 
         terminal_score = get_terminal_score(board, ai_player)
         if terminal_score is not None:
             elapsed = time.perf_counter() - start
-            return SearchResult(None, terminal_score, depth, 0, elapsed, self.algorithm_name, ai_player)
+            return SearchResult(None, terminal_score, depth, 0, elapsed, self.algorithm_name, ai_player, [])
 
         best_score = -math.inf
         best_move = None
@@ -75,6 +79,7 @@ class AlphaBetaSearch(BaseSearch):
             elapsed,
             self.algorithm_name,
             ai_player,
+            list(self.pruning_events),
         )
 
     def _alpha_beta(
@@ -125,7 +130,7 @@ class AlphaBetaSearch(BaseSearch):
         if current_player == ai_player:
             value = -math.inf
             best_move = moves[0]
-            for row, col in moves:
+            for move_index, (row, col) in enumerate(moves):
                 board.place_move(row, col, current_player)
                 score = self._alpha_beta(board, depth - 1, alpha, beta, next_player, ai_player, search_depth)
                 board.undo_move(row, col)
@@ -134,11 +139,18 @@ class AlphaBetaSearch(BaseSearch):
                     best_move = (row, col)
                 alpha = max(alpha, value)
                 if beta <= alpha:
+                    self._record_pruning(
+                        depth_remaining=depth,
+                        search_depth=search_depth,
+                        alpha=alpha,
+                        beta=beta,
+                        skipped_moves=len(moves) - move_index - 1,
+                    )
                     break
         else:
             value = math.inf
             best_move = moves[0]
-            for row, col in moves:
+            for move_index, (row, col) in enumerate(moves):
                 board.place_move(row, col, current_player)
                 score = self._alpha_beta(board, depth - 1, alpha, beta, next_player, ai_player, search_depth)
                 board.undo_move(row, col)
@@ -147,6 +159,13 @@ class AlphaBetaSearch(BaseSearch):
                     best_move = (row, col)
                 beta = min(beta, value)
                 if beta <= alpha:
+                    self._record_pruning(
+                        depth_remaining=depth,
+                        search_depth=search_depth,
+                        alpha=alpha,
+                        beta=beta,
+                        skipped_moves=len(moves) - move_index - 1,
+                    )
                     break
 
         value = int(value)
@@ -174,3 +193,30 @@ class AlphaBetaSearch(BaseSearch):
             flag=flag,
             best_move=best_move,
         )
+
+    def _record_pruning(
+        self,
+        depth_remaining: int,
+        search_depth: int,
+        alpha: float,
+        beta: float,
+        skipped_moves: int,
+    ) -> None:
+        self._prune_timestamp += 1
+        self.pruning_events.append(
+            {
+                "depth_where_pruned": max(1, search_depth - depth_remaining + 1),
+                "alpha": self._serializable_bound(alpha),
+                "beta": self._serializable_bound(beta),
+                "nodes_pruned_estimate": max(0, skipped_moves),
+                "timestamp": self._prune_timestamp,
+            }
+        )
+
+    @staticmethod
+    def _serializable_bound(value: float) -> int | float | str:
+        if math.isinf(value):
+            return "inf" if value > 0 else "-inf"
+        if float(value).is_integer():
+            return int(value)
+        return value

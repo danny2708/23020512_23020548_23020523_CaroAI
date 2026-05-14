@@ -45,6 +45,50 @@ class Evaluator:
         self.cache[cache_key] = score
         return score
 
+    def score_breakdown(
+        self,
+        board: Board,
+        ai_player: str = AI,
+        evaluated_move: tuple[int, int] | None = None,
+    ) -> dict[str, int]:
+        """Return the heuristic components used by the benchmark EDA logs."""
+        terminal_score = get_terminal_score(board, ai_player)
+        if terminal_score is not None:
+            return self._terminal_breakdown(terminal_score)
+
+        opponent = get_opponent(ai_player)
+        attack_score = 0
+        defense_score = 0
+        for window in self._get_windows(board.size):
+            ai_count = 0
+            opponent_count = 0
+            empty_count = 0
+
+            for row, col in window:
+                value = board.grid[row][col]
+                if value == ai_player:
+                    ai_count += 1
+                elif value == opponent:
+                    opponent_count += 1
+                elif value == EMPTY:
+                    empty_count += 1
+
+            if ai_count and opponent_count:
+                continue
+            if ai_count:
+                attack_score += self._score_counts(ai_count, empty_count)
+            elif opponent_count:
+                defense_score -= self._score_counts(opponent_count, empty_count)
+
+        position_weight = self._position_weight(board, evaluated_move)
+        final_score = attack_score + defense_score + position_weight
+        return {
+            "score_attack": attack_score,
+            "score_defense": defense_score,
+            "position_weight": position_weight,
+            "final_heuristic_score": final_score,
+        }
+
     def _evaluate_python(self, board: Board, ai_player: str, opponent: str) -> int:
         score = 0
         for window in self._get_windows(board.size):
@@ -101,3 +145,25 @@ class Evaluator:
         if player_count == 1 and empty_count == WIN_LENGTH - 1:
             return 10
         return 0
+
+    def _position_weight(self, board: Board, evaluated_move: tuple[int, int] | None) -> int:
+        # The current assignment heuristic does not add positional weight to the final score.
+        # Keep this component explicit so EDA can show that the deployed evaluator is pattern-based.
+        return 0
+
+    def _terminal_breakdown(self, terminal_score: int) -> dict[str, int]:
+        if terminal_score > 0:
+            attack_score = terminal_score
+            defense_score = 0
+        elif terminal_score < 0:
+            attack_score = 0
+            defense_score = terminal_score
+        else:
+            attack_score = 0
+            defense_score = 0
+        return {
+            "score_attack": attack_score,
+            "score_defense": defense_score,
+            "position_weight": 0,
+            "final_heuristic_score": terminal_score,
+        }

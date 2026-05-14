@@ -6,8 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from tkinter import messagebox, ttk
 
-from benchmark.result_writer import write_results_csv
-from benchmark.test_states import TEST_STATES
+from benchmark.benchmark_runner import run_benchmark as run_benchmark_suite
 from core.board import Board
 from core.constants import AI, EMPTY, HUMAN
 from engine.ai_runner import AI_MODE_OPTIONS, base_algorithm, create_ai, normalize_ai_mode
@@ -15,7 +14,7 @@ from engine.auto_play import AutoPlayGame, AutoPlayStep
 from engine.game_engine import GameEngine, HumanVsAIMove
 
 
-RESULT_PATH = Path(__file__).resolve().parents[1] / "results" / "benchmark_results.csv"
+RESULT_DIR = Path(__file__).resolve().parents[1] / "results"
 SESSION_DIR = Path(__file__).resolve().parents[1] / "results" / "sessions"
 
 APP_BG = "#eef2f7"
@@ -1091,22 +1090,25 @@ class BenchmarkFrame(ttk.Frame):
         ttk.Label(controls, textvariable=self.status_var).grid(row=0, column=3, padx=(14, 0), sticky=tk.W)
 
         columns = (
-            "state",
-            "board_size",
-            "depth",
-            "algorithm",
-            "ai_player",
-            "best_move",
-            "score",
-            "nodes_visited",
-            "elapsed_time",
+            "Test_ID",
+            "State_Name",
+            "Algorithm",
+            "Depth_Limit",
+            "Best_Move_X",
+            "Best_Move_Y",
+            "Eval_Score",
+            "Total_Visited_Nodes",
+            "Execution_Time_ms",
+            "Winning_Status_Found",
         )
         self.table = ttk.Treeview(self, columns=columns, show="headings", height=22)
         for column in columns:
             self.table.heading(column, text=column)
             self.table.column(column, width=120, anchor=tk.CENTER)
-        self.table.column("state", width=190, anchor=tk.W)
-        self.table.column("algorithm", width=170, anchor=tk.CENTER)
+        self.table.column("Test_ID", width=90, anchor=tk.CENTER)
+        self.table.column("State_Name", width=190, anchor=tk.W)
+        self.table.column("Algorithm", width=140, anchor=tk.CENTER)
+        self.table.column("Winning_Status_Found", width=150, anchor=tk.CENTER)
         self.table.pack(fill=tk.BOTH, expand=True)
 
     def run_benchmark(self) -> None:
@@ -1126,50 +1128,43 @@ class BenchmarkFrame(ttk.Frame):
         threading.Thread(target=self._benchmark_worker, args=(depths,), daemon=True).start()
 
     def _benchmark_worker(self, depths: list[int]) -> None:
-        rows = []
-        for state_name, state_rows in TEST_STATES.items():
-            for depth in depths:
-                for mode in ("minimax", "alphabeta", "minimax-improve", "alphabeta-improve"):
-                    board = Board.from_strings(state_rows)
-                    ai = create_ai(mode=mode, move_mode="nearby", radius=1)
-                    result = ai.search(board, depth, ai_player=AI)
-                    row = {
-                        "state": state_name,
-                        "board_size": board.size,
-                        "depth": depth,
-                        "algorithm": result.algorithm,
-                        "ai_player": result.player,
-                        "best_move": result.best_move,
-                        "score": result.score,
-                        "nodes_visited": result.nodes_visited,
-                        "elapsed_time": f"{result.elapsed_time:.6f}",
-                    }
-                    rows.append(row)
-                    self.after(0, self._add_result_row, row)
+        try:
+            result = run_benchmark_suite(depths=depths, output_dir=RESULT_DIR)
+        except Exception as exc:
+            self.after(0, self._fail_benchmark, str(exc))
+            return
 
-        write_results_csv(rows, str(RESULT_PATH))
-        self.after(0, self._finish_benchmark, len(rows))
+        rows = result["summary"]
+        for row in rows:
+            self.after(0, self._add_result_row, row)
+        self.after(0, self._finish_benchmark, len(rows), result["paths"])
 
     def _add_result_row(self, row: dict) -> None:
         self.table.insert(
             "",
             tk.END,
             values=(
-                row["state"],
-                row["board_size"],
-                row["depth"],
-                row["algorithm"],
-                row["ai_player"],
-                row["best_move"],
-                row["score"],
-                row["nodes_visited"],
-                row["elapsed_time"],
+                row["Test_ID"],
+                row["State_Name"],
+                row["Algorithm"],
+                row["Depth_Limit"],
+                row["Best_Move_X"],
+                row["Best_Move_Y"],
+                row["Eval_Score"],
+                row["Total_Visited_Nodes"],
+                row["Execution_Time_ms"],
+                row["Winning_Status_Found"],
             ),
         )
 
-    def _finish_benchmark(self, total_rows: int) -> None:
+    def _finish_benchmark(self, total_rows: int, paths: dict) -> None:
         self.running = False
-        self.status_var.set(f"Saved {total_rows} rows to {RESULT_PATH}")
+        self.status_var.set(f"Saved {total_rows} summary rows to {paths['summary']}")
+
+    def _fail_benchmark(self, message: str) -> None:
+        self.running = False
+        self.status_var.set("Benchmark failed.")
+        messagebox.showerror("Benchmark failed", message)
 
     def _parse_depths(self) -> list[int]:
         raw_values = [value.strip() for value in self.depths_var.get().split(",")]
