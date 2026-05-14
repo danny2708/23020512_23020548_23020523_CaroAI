@@ -12,7 +12,7 @@ from core.board import Board
 from core.constants import AI, EMPTY, HUMAN
 from engine.ai_runner import AI_MODE_OPTIONS, base_algorithm, create_ai, normalize_ai_mode
 from engine.auto_play import AutoPlayGame, AutoPlayStep
-from engine.game_engine import GameEngine
+from engine.game_engine import GameEngine, HumanVsAIMove
 
 
 RESULT_PATH = Path(__file__).resolve().parents[1] / "results" / "benchmark_results.csv"
@@ -207,6 +207,7 @@ class HumanVsAIFrame(ttk.Frame):
         )
 
         ttk.Button(controls, text="New game", command=self.new_game).grid(row=0, column=6)
+        ttk.Button(controls, text="Back step", command=self.back_one_turn).grid(row=0, column=7, padx=(8, 0))
 
         body = ttk.Frame(self)
         body.pack(fill=tk.BOTH, expand=True)
@@ -310,6 +311,48 @@ class HumanVsAIFrame(ttk.Frame):
         self.status_var.set(f"Game over: {label}")
         self._append_log(f"Game over: {label}")
 
+    def back_one_turn(self) -> None:
+        if self.game is None:
+            return
+        if self.busy:
+            self.status_var.set("Wait for the AI move to finish before going back.")
+            return
+
+        removed = self.game.undo_last_turn()
+        if not removed:
+            self.status_var.set("No move to undo.")
+            return
+
+        self.board_view.refresh_board(self.game.board)
+        self.board_view.set_interactive(True)
+        self._reload_log_from_history()
+        removed_text = ", ".join(f"{move.player}{move.move}" for move in removed)
+        self.status_var.set(
+            f"Backed up: {removed_text}. Change AI mode/depth if needed, then place X."
+        )
+
+    def _reload_log_from_history(self) -> None:
+        if self.game is None:
+            return
+
+        self._clear_log()
+        self._append_log(f"Current Human vs AI game. AI mode={self.game.ai_mode}, depth={self.game.depth}.")
+        for move in self.game.history:
+            self._append_log(self._format_history_move(move))
+
+    def _format_history_move(self, move: HumanVsAIMove) -> str:
+        if move.player == HUMAN:
+            return f"Human X moved to {move.move}."
+
+        result = move.result
+        if result is None:
+            return f"AI O moved to {move.move}."
+        return (
+            f"AI {result.player} | {result.algorithm} | move={result.best_move} | "
+            f"score={result.score} | depth={result.depth} | "
+            f"nodes={result.nodes_visited} | time={result.elapsed_time:.6f}s"
+        )
+
     def _append_log(self, message: str) -> None:
         self.log.configure(state=tk.NORMAL)
         self.log.insert(tk.END, message + "\n")
@@ -354,6 +397,14 @@ class HumanVsAIFrame(ttk.Frame):
         if self.game is not None and not self.game.board.get_occupied_cells():
             self.new_game()
             return True
+
+        if self.game is not None:
+            size, mode, depth = settings
+            if size == self.game.board.size:
+                self.game.update_ai(mode, depth)
+                self.game_settings = settings
+                self._append_log(f"AI settings updated. AI mode={mode}, depth={depth}.")
+                return True
 
         self.status_var.set("Settings changed. Press New game to apply them.")
         return False
@@ -438,16 +489,17 @@ class AIVsAIFrame(ttk.Frame):
         self.run_button.grid(row=2, column=2, padx=(8, 0), pady=(8, 0))
         ttk.Button(controls, text="Pause", command=self.pause).grid(row=2, column=3, padx=(8, 0), pady=(8, 0))
         ttk.Button(controls, text="Resume", command=self.resume).grid(row=2, column=4, padx=(8, 0), pady=(8, 0))
+        ttk.Button(controls, text="Back step", command=self.back_one_step).grid(row=2, column=5, padx=(8, 0), pady=(8, 0))
         self.swap_button = ttk.Button(controls, text="Swap roles", command=self.swap_roles)
         self.swap_button.grid(
-            row=2, column=5, padx=(8, 0), pady=(8, 0)
+            row=2, column=6, padx=(8, 0), pady=(8, 0)
         )
         ttk.Button(controls, text="Save state", command=self.save_current_state).grid(
-            row=2, column=6, padx=(8, 0), pady=(8, 0)
+            row=2, column=7, padx=(8, 0), pady=(8, 0)
         )
         self.cutoff_label = ttk.Label(controls, textvariable=self.cutoff_var, style="Metric.TLabel")
         self.cutoff_label.grid(
-            row=3, column=0, columnspan=7, padx=(0, 0), pady=(10, 0), sticky=tk.W
+            row=3, column=0, columnspan=8, padx=(0, 0), pady=(10, 0), sticky=tk.W
         )
 
         self.cutoff_container = ttk.Frame(self, style="Surface.TFrame")
@@ -594,6 +646,9 @@ class AIVsAIFrame(ttk.Frame):
         if self.game is None:
             return
 
+        if not self._ensure_current_settings():
+            return
+
         if self.game.status() == "ONGOING" and len(self.game.history) >= self.game.max_turns:
             try:
                 self.game.max_turns += self._read_int(self.branch_moves_var, minimum=1)
@@ -604,6 +659,29 @@ class AIVsAIFrame(ttk.Frame):
         if self.game.status() == "ONGOING":
             self.running = True
             self._start_main_step(keep_running=True)
+
+    def back_one_step(self) -> None:
+        if self.busy or self.running or self.branch_running:
+            self.status_var.set("Pause the game before going back one step.")
+            return
+        if self.branch_games is not None:
+            self.status_var.set("Back step is available only before creating swap branches.")
+            return
+        if self.game is None:
+            return
+
+        undone = self.game.undo_last_step()
+        if undone is None:
+            self.status_var.set("No move to undo.")
+            return
+
+        if len(self.game.history) < self.game.max_turns:
+            self.branch_status_logged = set()
+        self.original_pane.load_history(self.game, "Current / original roles")
+        self.status_var.set(
+            f"Backed up turn {undone.turn:02d}. Next player is {self.game.current_player}. "
+            "Change X/O AI mode, then press Step or Run all."
+        )
 
     def swap_roles(self) -> None:
         if self.game is None or self.busy:
@@ -972,6 +1050,24 @@ class AIVsAIFrame(ttk.Frame):
         if self.game is not None and not self.game.history:
             self.new_game()
             return True
+
+        if self.game is not None and self.branch_games is None:
+            size, x_mode, o_mode, depth, max_turns = settings
+            same_runtime_shape = (
+                size == self.game.board.size
+                and depth == self.game.depth
+                and max_turns == self.game.max_turns
+            )
+            if same_runtime_shape:
+                self.game.update_ai_modes(x_mode, o_mode)
+                self.game_settings = settings
+                self._set_branch_controls_visibility(self._should_enable_swap_for_modes(x_mode, o_mode))
+                self._set_cutoff_visibility(self._should_show_cutoff_for_modes(x_mode, o_mode))
+                self.original_pane.load_history(self.game, "Current / original roles")
+                self.status_var.set(
+                    f"AI modes updated. Next player {self.game.current_player} will use the selected mode."
+                )
+                return True
 
         self.status_var.set("Settings changed. Press New game to apply them.")
         return False

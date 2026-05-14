@@ -58,6 +58,10 @@ UI có các chế độ:
 - AI X vs AI O
 - Benchmark Minimax vs Alpha-Beta
 
+## Human vs AI
+
+- `Back step`: lùi lại lượt gần nhất. Nếu AI vừa đi xong, thao tác này xóa cả nước AI và nước Human ngay trước đó để trả về lượt Human. Sau đó có thể đổi AI mode/depth cho nước kế tiếp.
+
 ## Các chế độ AI
 
 - `minimax`: Minimax chuẩn trong tập nước đi ứng viên gần quân đã đánh. Chế độ này dùng các tối ưu an toàn như cache đánh giá, transposition table, Zobrist hash và kiểm tra thắng quanh nước cuối.
@@ -72,6 +76,7 @@ Lưu ý: `*-improve` là chế độ AI thực dụng để chạy depth cao nha
 Trong AI X vs AI O:
 
 - `Pause`: dừng autoplay an toàn.
+- `Back step`: sau khi pause, lùi lại một nước cuối cùng để chọn lại model cho lượt kế tiếp.
 - `Resume`: tiếp tục ván cờ hoặc thêm batch nước mới nếu đã hết giới hạn hiện tại.
 - `Swap roles`: lưu trạng thái hiện tại và tạo hai nhánh tiếp diễn.
 - `Save state`: lưu bàn cờ và log hiện tại.

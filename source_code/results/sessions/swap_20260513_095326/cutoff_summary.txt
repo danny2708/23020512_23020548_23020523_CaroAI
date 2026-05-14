@@ -1,0 +1,11 @@
+alpha_beta_cutoff_nodes_total=78796
+Turn 04 | Alpha-Beta-Improve's nodes: 481 | Minimax-Improve's nodes=11882 | Nodes cut off=11401
+Turn 05 | Alpha-Beta-Improve's nodes: 455 | Minimax-Improve's nodes=10160 | Nodes cut off=9705
+Turn 06 | Alpha-Beta-Improve's nodes: 359 | Minimax-Improve's nodes=8321 | Nodes cut off=7962
+Turn 07 | Alpha-Beta-Improve's nodes: 469 | Minimax-Improve's nodes=7598 | Nodes cut off=7129
+Turn 08 | Alpha-Beta-Improve's nodes: 405 | Minimax-Improve's nodes=8903 | Nodes cut off=8498
+Turn 09 | Alpha-Beta-Improve's nodes: 467 | Minimax-Improve's nodes=8216 | Nodes cut off=7749
+Turn 10 | Alpha-Beta-Improve's nodes: 383 | Minimax-Improve's nodes=8585 | Nodes cut off=8202
+Turn 11 | Alpha-Beta-Improve's nodes: 497 | Minimax-Improve's nodes=9659 | Nodes cut off=9162
+Turn 12 | Alpha-Beta-Improve's nodes: 95 | Minimax-Improve's nodes=3188 | Nodes cut off=3093
+Turn 13 | Alpha-Beta-Improve's nodes: 338 | Minimax-Improve's nodes=6233 | Nodes cut off=5895

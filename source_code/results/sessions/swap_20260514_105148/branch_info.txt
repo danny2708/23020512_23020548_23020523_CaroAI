@@ -1,0 +1,10 @@
+snapshot_turns=5
+snapshot_nodes=33157
+snapshot_time=0.702254
+next_player=O
+original_x_mode=minimax-improve
+original_o_mode=alphabeta-improve
+swapped_x_mode=alphabeta-improve
+swapped_o_mode=minimax-improve
+branch_max_turns=9
+alpha_beta_cutoff_nodes=0

@@ -1,0 +1,21 @@
+X=alphabeta-improve
+O=minimax-improve
+depth=8
+current_player=O
+turns=13
+max_turns=19
+total_nodes=62045
+total_time=1.998673
+Turn 01 | Player X | Minimax-Improve | move=(5, 5) | score=-190 | depth=8 | nodes=2410 | time=0.098289s
+Turn 02 | Player O | Alpha-Beta-Improve | move=(4, 4) | score=-930 | depth=8 | nodes=1981 | time=0.094394s
+Turn 03 | Player X | Minimax-Improve | move=(5, 3) | score=100000 | depth=8 | nodes=14549 | time=0.594711s
+Turn 04 | Player O | Minimax-Improve | move=(5, 4) | score=-100000 | depth=8 | nodes=11882 | time=0.256422s
+Turn 05 | Player X | Alpha-Beta-Improve | move=(6, 4) | score=100000 | depth=8 | nodes=455 | time=0.015421s
+Turn 06 | Player O | Minimax-Improve | move=(4, 6) | score=-100000 | depth=8 | nodes=8321 | time=0.222604s
+Turn 07 | Player X | Alpha-Beta-Improve | move=(4, 5) | score=100000 | depth=8 | nodes=469 | time=0.017448s
+Turn 08 | Player O | Minimax-Improve | move=(6, 5) | score=-100000 | depth=8 | nodes=8903 | time=0.257748s
+Turn 09 | Player X | Alpha-Beta-Improve | move=(4, 3) | score=100000 | depth=8 | nodes=467 | time=0.019354s
+Turn 10 | Player O | Minimax-Improve | move=(6, 3) | score=-100000 | depth=8 | nodes=8585 | time=0.237681s
+Turn 11 | Player X | Alpha-Beta-Improve | move=(7, 5) | score=100000 | depth=8 | nodes=497 | time=0.026860s
+Turn 12 | Player O | Minimax-Improve | move=(8, 6) | score=-100000 | depth=8 | nodes=3188 | time=0.132213s
+Turn 13 | Player X | Alpha-Beta-Improve | move=(4, 2) | score=100000 | depth=8 | nodes=338 | time=0.025528s

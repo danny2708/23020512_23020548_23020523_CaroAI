@@ -99,6 +99,28 @@ class AutoPlayGame:
         self.current_player = AI if player == HUMAN else HUMAN
         return step
 
+    def undo_last_step(self) -> AutoPlayStep | None:
+        if not self.history:
+            return None
+
+        step = self.history.pop()
+        if step.move is not None:
+            row, col = step.move
+            self.board.undo_move(row, col)
+        self.current_player = step.player
+        return step
+
+    def update_ai_modes(self, x_mode: str, o_mode: str) -> None:
+        x_mode = normalize_ai_mode(x_mode)
+        o_mode = normalize_ai_mode(o_mode)
+
+        if x_mode != self.x_mode:
+            self.x_mode = x_mode
+            self.x_ai = create_ai(self.x_mode)
+        if o_mode != self.o_mode:
+            self.o_mode = o_mode
+            self.o_ai = create_ai(self.o_mode)
+
     def _choose_move(self, player: str) -> SearchResult:
         search_board = self.board.clone()
         if player == AI:
