@@ -424,7 +424,7 @@ class AIVsAIFrame(ttk.Frame):
         self.size_var = tk.StringVar(value="9")
         self.depth_var = tk.StringVar(value="2")
         self.max_turns_var = tk.StringVar(value="81")
-        self.branch_moves_var = tk.StringVar(value="4")
+        self.next_moves_var = tk.StringVar(value="4")
         self.cutoff_var = tk.StringVar(value="Alpha-Beta cut-off nodes: 0")
         self.x_mode_var = tk.StringVar(value="3 - minimax-improve")
         self.o_mode_var = tk.StringVar(value="4 - alphabeta-improve")
@@ -477,8 +477,8 @@ class AIVsAIFrame(ttk.Frame):
             row=1, column=3, padx=(6, 14), pady=(8, 0)
         )
 
-        ttk.Label(controls, text="Next moves after swap").grid(row=1, column=4, sticky=tk.W, pady=(8, 0))
-        ttk.Spinbox(controls, from_=1, to=200, width=7, textvariable=self.branch_moves_var).grid(
+        ttk.Label(controls, text="Next moves").grid(row=1, column=4, sticky=tk.W, pady=(8, 0))
+        ttk.Spinbox(controls, from_=1, to=200, width=7, textvariable=self.next_moves_var).grid(
             row=1, column=5, padx=(6, 14), pady=(8, 0)
         )
 
@@ -582,6 +582,7 @@ class AIVsAIFrame(ttk.Frame):
         if self.busy or self.running or self.branch_running:
             return
         if self.branch_games is not None:
+            self._allow_one_branch_step()
             self._start_branch_step(keep_running=False)
             return
         if self.game is None:
@@ -591,6 +592,7 @@ class AIVsAIFrame(ttk.Frame):
         if self.game.status() != "ONGOING":
             self.status_var.set(f"Game over: {self.game.status()}")
             return
+        self._allow_one_main_step()
         self._start_main_step(keep_running=False)
 
     def toggle_run(self) -> None:
@@ -634,12 +636,19 @@ class AIVsAIFrame(ttk.Frame):
         if self.busy:
             return
 
+        try:
+            next_moves = self._read_next_moves()
+        except ValueError as exc:
+            messagebox.showerror("Invalid input", str(exc))
+            return
+
         if self.branch_games is not None:
-            if not self._has_branch_move_left():
-                self._extend_branch_limits()
+            self._set_branch_resume_limits(next_moves)
             if self._has_branch_move_left():
                 self.branch_running = True
                 self._start_branch_step(keep_running=True)
+            else:
+                self.status_var.set("No unfinished branch can resume.")
             return
 
         if self.game is None:
@@ -648,16 +657,13 @@ class AIVsAIFrame(ttk.Frame):
         if not self._ensure_current_settings():
             return
 
-        if self.game.status() == "ONGOING" and len(self.game.history) >= self.game.max_turns:
-            try:
-                self.game.max_turns += self._read_int(self.branch_moves_var, minimum=1)
-            except ValueError as exc:
-                messagebox.showerror("Invalid input", str(exc))
-                return
-
         if self.game.status() == "ONGOING":
+            self.game.max_turns = len(self.game.history) + next_moves
             self.running = True
+            self.status_var.set(f"Resume will play at most {next_moves} more moves.")
             self._start_main_step(keep_running=True)
+        else:
+            self.status_var.set(f"Cannot resume: game status is {self.game.status()}.")
 
     def back_one_step(self) -> None:
         if self.busy or self.running or self.branch_running:
@@ -698,7 +704,7 @@ class AIVsAIFrame(ttk.Frame):
             return
 
         try:
-            additional_turns = self._read_int(self.branch_moves_var, minimum=1)
+            additional_turns = self._read_next_moves()
         except ValueError as exc:
             messagebox.showerror("Invalid input", str(exc))
             return
@@ -746,7 +752,11 @@ class AIVsAIFrame(ttk.Frame):
         if self.game.status() != "ONGOING" or len(self.game.history) >= self.game.max_turns:
             self.running = False
             self.run_button.configure(text="Run all")
-            self.status_var.set(f"Game over: {self._effective_status(self.game)}")
+            effective_status = self._effective_status(self.game)
+            if effective_status == "MAX_TURNS_REACHED":
+                self.status_var.set("Reached the current move limit. Use Resume to continue.")
+            else:
+                self.status_var.set(f"Game over: {effective_status}")
             return
 
         self.busy = True
@@ -779,7 +789,11 @@ class AIVsAIFrame(ttk.Frame):
             self.status_var.set("Auto play stopped: max turns reached or no legal move.")
             return
 
-        if status == "ONGOING":
+        if status == "ONGOING" and len(self.game.history) >= self.game.max_turns:
+            self.running = False
+            self.run_button.configure(text="Run all")
+            self.status_var.set("Reached the current move limit. Use Resume to continue.")
+        elif status == "ONGOING":
             if keep_running and self.running:
                 self.status_var.set("Auto play running...")
                 self.after(80, lambda: self._start_main_step(keep_running=True))
@@ -848,20 +862,27 @@ class AIVsAIFrame(ttk.Frame):
             return False
         return any(game.status() == "ONGOING" and len(game.history) < game.max_turns for game in self.branch_games.values())
 
-    def _extend_branch_limits(self) -> None:
+    def _allow_one_main_step(self) -> None:
+        if self.game is not None and self.game.status() == "ONGOING":
+            self.game.max_turns = max(self.game.max_turns, len(self.game.history) + 1)
+
+    def _allow_one_branch_step(self) -> None:
         if self.branch_games is None:
-            return
-        try:
-            additional_turns = self._read_int(self.branch_moves_var, minimum=1)
-        except ValueError as exc:
-            messagebox.showerror("Invalid input", str(exc))
             return
 
         for game in self.branch_games.values():
             if game.status() == "ONGOING":
-                game.max_turns = len(game.history) + additional_turns
+                game.max_turns = max(game.max_turns, len(game.history) + 1)
+
+    def _set_branch_resume_limits(self, next_moves: int) -> None:
+        if self.branch_games is None:
+            return
+
+        for game in self.branch_games.values():
+            if game.status() == "ONGOING":
+                game.max_turns = len(game.history) + next_moves
         self.branch_status_logged = set()
-        self.status_var.set(f"Resume added {additional_turns} more moves to unfinished branches.")
+        self.status_var.set(f"Resume will play at most {next_moves} more moves on unfinished branches.")
 
     def _update_cutoff_from_updates(self, updates) -> None:
         if not self.cutoff_comparison_enabled:
@@ -1014,6 +1035,9 @@ class AIVsAIFrame(ttk.Frame):
         lines.extend(format_autoplay_step(step) for step in game.history)
         return "\n".join(lines)
 
+    def _read_next_moves(self) -> int:
+        return self._read_int(self.next_moves_var, minimum=1, maximum=200)
+
     def _read_int(self, var: tk.StringVar, minimum: int, maximum: int | None = None) -> int:
         try:
             value = int(var.get())
@@ -1052,10 +1076,11 @@ class AIVsAIFrame(ttk.Frame):
 
         if self.game is not None and self.branch_games is None:
             size, x_mode, o_mode, depth, max_turns = settings
+            configured_max_turns = self.game_settings[4] if self.game_settings is not None else self.game.max_turns
             same_runtime_shape = (
                 size == self.game.board.size
                 and depth == self.game.depth
-                and max_turns == self.game.max_turns
+                and max_turns == configured_max_turns
             )
             if same_runtime_shape:
                 self.game.update_ai_modes(x_mode, o_mode)
