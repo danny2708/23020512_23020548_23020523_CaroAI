@@ -44,6 +44,18 @@ class MoveGenerator:
         self.ultra_deep_max_candidates = ultra_deep_max_candidates
         self.ultra_deep_depth = ultra_deep_depth
 
+    def uses_candidate_limits(self) -> bool:
+        return any(
+            limit > 0
+            for limit in (
+                self.max_candidates,
+                self.root_max_candidates,
+                self.deep_max_candidates,
+                self.very_deep_max_candidates,
+                self.ultra_deep_max_candidates,
+            )
+        )
+
     def generate(
         self,
         board: Board,
@@ -64,7 +76,11 @@ class MoveGenerator:
 
         ordered = self._order_moves(board, candidates, player)
         ordered = self._promote_priority_move(ordered, priority_move)
-        return self._limit_moves(ordered, depth_remaining, search_depth, is_root)
+        tactical_moves = []
+        if self.uses_candidate_limits():
+            tactical_moves = self._tactical_moves(board, ordered, player)
+            ordered = self._promote_moves(ordered, tactical_moves)
+        return self._limit_moves(ordered, depth_remaining, search_depth, is_root, tactical_moves)
 
     def _generate_nearby_moves(self, board: Board) -> list[tuple[int, int]]:
         occupied = board.get_occupied_cells()
@@ -165,10 +181,17 @@ class MoveGenerator:
         depth_remaining: int | None,
         search_depth: int | None,
         is_root: bool,
+        protected_moves: list[tuple[int, int]] | None = None,
     ) -> list[tuple[int, int]]:
         limit = self._candidate_limit(depth_remaining, search_depth, is_root)
         if limit <= 0 or len(ordered_moves) <= limit:
             return ordered_moves
+        if protected_moves:
+            protected_set = set(protected_moves)
+            required = [move for move in ordered_moves if move in protected_set]
+            remaining = [move for move in ordered_moves if move not in protected_set]
+            room = max(0, limit - len(required))
+            return required + remaining[:room]
         return ordered_moves[:limit]
 
     def _candidate_limit(self, depth_remaining: int | None, search_depth: int | None, is_root: bool) -> int:
@@ -200,6 +223,41 @@ class MoveGenerator:
         if priority_move is None or priority_move not in ordered_moves:
             return ordered_moves
         return [priority_move] + [move for move in ordered_moves if move != priority_move]
+
+    def _tactical_moves(
+        self,
+        board: Board,
+        ordered_moves: list[tuple[int, int]],
+        player: str,
+    ) -> list[tuple[int, int]]:
+        winning_moves = self.winning_moves(board, ordered_moves, player)
+        if winning_moves:
+            return winning_moves
+        return self.winning_moves(board, ordered_moves, get_opponent(player))
+
+    def winning_moves(
+        self,
+        board: Board,
+        moves: list[tuple[int, int]],
+        player: str,
+    ) -> list[tuple[int, int]]:
+        return [
+            (row, col)
+            for row, col in moves
+            if self._local_pattern_score(board, row, col, player) >= WIN_MOVE_SCORE
+        ]
+
+    def _promote_moves(
+        self,
+        ordered_moves: list[tuple[int, int]],
+        priority_moves: list[tuple[int, int]],
+    ) -> list[tuple[int, int]]:
+        if not priority_moves:
+            return ordered_moves
+        priority_set = set(priority_moves)
+        promoted = [move for move in ordered_moves if move in priority_set]
+        rest = [move for move in ordered_moves if move not in priority_set]
+        return promoted + rest
 
     def _sort_by_center(self, board: Board, moves: list[tuple[int, int]]) -> list[tuple[int, int]]:
         center = (board.size - 1) / 2

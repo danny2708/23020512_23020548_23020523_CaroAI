@@ -9,7 +9,7 @@ if str(PROJECT_SOURCE) not in sys.path:
 from benchmark.result_writer import write_csv
 from benchmark.test_states import TEST_STATES
 from core.board import Board
-from core.constants import AI
+from core.constants import AI, TERMINAL_WIN_SCORE
 from engine.ai_runner import create_ai
 
 
@@ -79,7 +79,7 @@ def run_benchmark(
                     "Eval_Score": result.score,
                     "Total_Visited_Nodes": result.nodes_visited,
                     "Execution_Time_ms": f"{result.elapsed_time * 1000:.3f}",
-                    "Winning_Status_Found": abs(result.score) >= 100_000,
+                    "Winning_Status_Found": abs(result.score) >= TERMINAL_WIN_SCORE,
                 }
                 summary_rows.append(row)
                 _append_pruning_rows(test_id, result.pruning_events, pruning_rows)

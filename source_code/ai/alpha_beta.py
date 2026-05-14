@@ -30,7 +30,7 @@ class AlphaBetaSearch(BaseSearch):
         depth = max(1, depth)
         start = time.perf_counter()
 
-        terminal_score = get_terminal_score(board, ai_player)
+        terminal_score = get_terminal_score(board, ai_player, depth_remaining=depth)
         if terminal_score is not None:
             elapsed = time.perf_counter() - start
             return SearchResult(None, terminal_score, depth, 0, elapsed, self.algorithm_name, ai_player, [])
@@ -94,11 +94,22 @@ class AlphaBetaSearch(BaseSearch):
     ) -> int:
         self.nodes_visited += 1
 
-        terminal_score = get_terminal_score(board, ai_player)
+        terminal_score = get_terminal_score(board, ai_player, depth_remaining=depth)
         if terminal_score is not None:
             return terminal_score
 
         if depth <= 0:
+            if self.move_generator.uses_candidate_limits():
+                leaf_moves = self.move_generator.generate(
+                    board,
+                    player=current_player,
+                    ai_player=ai_player,
+                    depth_remaining=1,
+                    search_depth=search_depth,
+                )
+                tactical_score = self.immediate_win_score(board, leaf_moves, current_player, ai_player)
+                if tactical_score is not None:
+                    return tactical_score
             return self.evaluator.evaluate(board, ai_player)
 
         key = (board.hash_key, current_player, ai_player)
@@ -125,6 +136,17 @@ class AlphaBetaSearch(BaseSearch):
         )
         if not moves:
             return self.evaluator.evaluate(board, ai_player)
+
+        if self.move_generator.uses_candidate_limits():
+            immediate_score = self.immediate_win_score(
+                board,
+                moves,
+                current_player,
+                ai_player,
+                depth_remaining=depth - 1,
+            )
+            if immediate_score is not None:
+                return immediate_score
 
         next_player = get_opponent(current_player)
         if current_player == ai_player:
