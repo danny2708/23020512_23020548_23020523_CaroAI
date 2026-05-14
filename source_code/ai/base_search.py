@@ -51,7 +51,6 @@ class BaseSearch:
 
         if not winning_moves:
             return None
-
         bonus = max(0, depth_remaining)
         if current_player == ai_player:
             return TERMINAL_WIN_SCORE + bonus

@@ -75,6 +75,10 @@ def move_score(board, row: int, col: int, ai_player: str) -> int:
 def _local_player_score(board, row: int, col: int, player: str) -> int:
     total = 0
     opponent = get_opponent(player)
+<<<<<<< HEAD
+=======
+
+>>>>>>> e2b8cdc64ab3329fa3b2bdebc9da42228845d9f9
     for dr, dc in DIRECTIONS:
         for offset in range(WIN_LENGTH):
             cells = []
