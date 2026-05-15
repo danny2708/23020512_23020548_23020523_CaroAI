@@ -9,7 +9,9 @@ if str(SOURCE_ROOT) not in sys.path:
 from core.board import Board
 from core.constants import AI, HUMAN
 from core.rules import check_winner
+from engine.auto_play import AutoPlayGame, AutoPlayStep
 from engine.ai_runner import create_ai
+from engine.game_engine import GameEngine, HumanVsAIMove
 
 
 def board_from_moves(moves: list[tuple[int, int]]) -> Board:
@@ -74,6 +76,45 @@ class TacticalSearchTests(unittest.TestCase):
                 with self.subTest(position=name, mode=mode):
                     result = create_ai(mode).search(board_from_moves(moves), 8, ai_player=AI)
                     self.assertEqual(result.best_move, expected_move)
+
+    def test_human_vs_ai_replays_backed_up_turn(self):
+        game = GameEngine(9)
+        game.human_move(4, 4)
+        ai_move = HumanVsAIMove(player=AI, move=(4, 5))
+        game.board.place_move(4, 5, AI)
+        game.history.append(ai_move)
+
+        removed = game.undo_last_turn()
+        self.assertTrue(game.board.is_empty_cell(4, 4))
+        self.assertTrue(game.board.is_empty_cell(4, 5))
+
+        self.assertTrue(game.replay_turn(removed))
+        self.assertEqual(game.board.grid[4][4], HUMAN)
+        self.assertEqual(game.board.grid[4][5], AI)
+        self.assertEqual([move.player for move in game.history], [HUMAN, AI])
+
+    def test_ai_vs_ai_replays_backed_up_step(self):
+        game = AutoPlayGame(size=9, max_turns=1)
+        step = AutoPlayStep(
+            turn=1,
+            player=HUMAN,
+            move=(4, 4),
+            score=0,
+            depth=1,
+            nodes_visited=0,
+            elapsed_time=0.0,
+            algorithm="Manual",
+            status_after_move="ONGOING",
+        )
+
+        self.assertTrue(game.replay_step(step))
+        removed = game.undo_last_step()
+        self.assertIsNotNone(removed)
+        self.assertTrue(game.board.is_empty_cell(4, 4))
+
+        self.assertTrue(game.replay_step(removed))
+        self.assertEqual(game.board.grid[4][4], HUMAN)
+        self.assertEqual(game.current_player, AI)
 
 
 if __name__ == "__main__":

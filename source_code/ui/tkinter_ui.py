@@ -4,7 +4,19 @@ import threading
 import tkinter as tk
 from datetime import datetime
 from pathlib import Path
-from tkinter import messagebox, ttk
+from tkinter import messagebox
+
+try:
+    import ttkbootstrap as ttk
+
+    USING_BOOTSTRAP_THEME = True
+except ImportError:
+    from tkinter import ttk
+
+    USING_BOOTSTRAP_THEME = False
+
+ThemedLabelFrame = ttk.Labelframe if hasattr(ttk, "Labelframe") else ttk.LabelFrame
+ThemedPanedWindow = ttk.Panedwindow if hasattr(ttk, "Panedwindow") else ttk.PanedWindow
 
 from benchmark.benchmark_runner import run_benchmark as run_benchmark_suite
 from core.board import Board
@@ -17,15 +29,21 @@ from engine.game_engine import GameEngine, HumanVsAIMove
 RESULT_DIR = Path(__file__).resolve().parents[1] / "results"
 SESSION_DIR = Path(__file__).resolve().parents[1] / "results" / "sessions"
 
-APP_BG = "#eef2f7"
+APP_BG = "#f3f6fb"
 PANEL_BG = "#ffffff"
 TEXT_BG = "#f8fafc"
-GRID_LINE = "#d1d5db"
+GRID_LINE = "#e2e8f0"
 X_BG = "#dbeafe"
 X_FG = "#1d4ed8"
-O_BG = "#fee2e2"
-O_FG = "#b91c1c"
-EMPTY_BG = "#f9fafb"
+O_BG = "#ffe4e6"
+O_FG = "#be123c"
+EMPTY_BG = "#f8fafc"
+INK = "#111827"
+MUTED = "#64748b"
+ACCENT = "#2563eb"
+ACCENT_HOVER = "#1d4ed8"
+ACCENT_PRESSED = "#1e40af"
+BOOTSTRAP_THEME = "flatly"
 
 
 def format_autoplay_step(step: AutoPlayStep) -> str:
@@ -65,7 +83,7 @@ class BoardView(ttk.Frame):
                     bd=0,
                     highlightthickness=1,
                     highlightbackground=GRID_LINE,
-                    activebackground="#e0f2fe",
+                    activebackground="#eef6ff",
                     cursor="hand2",
                     command=lambda r=row, c=col: self._handle_click(r, c),
                 )
@@ -99,17 +117,19 @@ class BoardView(ttk.Frame):
             self.on_cell_click(row, col)
 
 
-class AutoPlaySessionPane(ttk.LabelFrame):
+class AutoPlaySessionPane(ThemedLabelFrame):
     def __init__(self, master, title: str):
-        super().__init__(master, text=title, padding=10, style="Panel.TLabelframe")
+        super().__init__(master, text=title, style="Panel.TLabelframe")
         self.status_var = tk.StringVar(value="No session.")
+        self.content = ttk.Frame(self, padding=10, style="Surface.TFrame")
+        self.content.pack(fill=tk.BOTH, expand=True)
 
-        self.board_view = BoardView(self, cell_width=3, cell_height=1, font_size=10)
+        self.board_view = BoardView(self.content, cell_width=3, cell_height=1, font_size=10)
         self.board_view.pack(anchor=tk.NW)
 
-        ttk.Label(self, textvariable=self.status_var, wraplength=430, style="PanelMuted.TLabel").pack(anchor=tk.W, pady=(8, 4))
+        ttk.Label(self.content, textvariable=self.status_var, wraplength=430, style="PanelMuted.TLabel").pack(anchor=tk.W, pady=(8, 4))
         self.log = tk.Text(
-            self,
+            self.content,
             width=58,
             height=10,
             state=tk.DISABLED,
@@ -172,6 +192,7 @@ class HumanVsAIFrame(ttk.Frame):
         super().__init__(master, padding=12)
         self.game: GameEngine | None = None
         self.game_settings: tuple[int, str, int] | None = None
+        self.redo_turns: list[list[HumanVsAIMove]] = []
         self.busy = False
 
         self.size_var = tk.StringVar(value="9")
@@ -207,6 +228,7 @@ class HumanVsAIFrame(ttk.Frame):
 
         ttk.Button(controls, text="New game", command=self.new_game).grid(row=0, column=6)
         ttk.Button(controls, text="Back step", command=self.back_one_turn).grid(row=0, column=7, padx=(8, 0))
+        ttk.Button(controls, text="Next step", command=self.redo_one_turn).grid(row=0, column=8, padx=(8, 0))
 
         body = ttk.Frame(self)
         body.pack(fill=tk.BOTH, expand=True)
@@ -243,6 +265,7 @@ class HumanVsAIFrame(ttk.Frame):
 
         self.game = GameEngine(size=size, ai_mode=mode, depth=depth)
         self.game_settings = (size, mode, depth)
+        self.redo_turns = []
         self.board_view.build(size)
         self.board_view.refresh_board(self.game.board)
         self.board_view.set_interactive(True)
@@ -261,6 +284,7 @@ class HumanVsAIFrame(ttk.Frame):
         if self.game.status() != "ONGOING":
             return
 
+        self.redo_turns = []
         if not self.game.human_move(row, col):
             self.status_var.set("Invalid move. Choose an empty cell inside the board.")
             return
@@ -322,13 +346,40 @@ class HumanVsAIFrame(ttk.Frame):
             self.status_var.set("No move to undo.")
             return
 
+        self.redo_turns.append(removed)
         self.board_view.refresh_board(self.game.board)
         self.board_view.set_interactive(True)
         self._reload_log_from_history()
         removed_text = ", ".join(f"{move.player}{move.move}" for move in removed)
         self.status_var.set(
-            f"Backed up: {removed_text}. Change AI mode/depth if needed, then place X."
+            f"Backed up: {removed_text}. Use Next step to replay, or place X to create a new line."
         )
+
+    def redo_one_turn(self) -> None:
+        if self.game is None:
+            return
+        if self.busy:
+            self.status_var.set("Wait for the AI move to finish before replaying a backed-up step.")
+            return
+        if not self.redo_turns:
+            self.status_var.set("No backed-up move to replay.")
+            return
+
+        removed = self.redo_turns.pop()
+        if not self.game.replay_turn(removed):
+            self.redo_turns.append(removed)
+            self.status_var.set("Cannot replay the backed-up move from the current board.")
+            return
+
+        self.board_view.refresh_board(self.game.board)
+        self._reload_log_from_history()
+        status = self.game.status()
+        if status == "ONGOING":
+            self.board_view.set_interactive(True)
+            replayed_text = ", ".join(f"{move.player}{move.move}" for move in reversed(removed))
+            self.status_var.set(f"Replayed: {replayed_text}.")
+        else:
+            self._finish_game(status)
 
     def _reload_log_from_history(self) -> None:
         if self.game is None:
@@ -417,6 +468,7 @@ class AIVsAIFrame(ttk.Frame):
         self.game_settings: tuple[int, str, str, int, int] | None = None
         self.session_dir: Path | None = None
         self.branch_status_logged: set[str] = set()
+        self.redo_steps: list[AutoPlayStep] = []
         self.running = False
         self.busy = False
         self.branch_running = False
@@ -489,28 +541,30 @@ class AIVsAIFrame(ttk.Frame):
         ttk.Button(controls, text="Pause", command=self.pause).grid(row=2, column=3, padx=(8, 0), pady=(8, 0))
         ttk.Button(controls, text="Resume", command=self.resume).grid(row=2, column=4, padx=(8, 0), pady=(8, 0))
         ttk.Button(controls, text="Back step", command=self.back_one_step).grid(row=2, column=5, padx=(8, 0), pady=(8, 0))
+        ttk.Button(controls, text="Next step", command=self.redo_one_step).grid(row=2, column=6, padx=(8, 0), pady=(8, 0))
         self.swap_button = ttk.Button(controls, text="Swap roles", command=self.swap_roles)
         self.swap_button.grid(
-            row=2, column=6, padx=(8, 0), pady=(8, 0)
+            row=2, column=7, padx=(8, 0), pady=(8, 0)
         )
         ttk.Button(controls, text="Save state", command=self.save_current_state).grid(
-            row=2, column=7, padx=(8, 0), pady=(8, 0)
+            row=2, column=8, padx=(8, 0), pady=(8, 0)
         )
         self.cutoff_label = ttk.Label(controls, textvariable=self.cutoff_var, style="Metric.TLabel")
         self.cutoff_label.grid(
-            row=3, column=0, columnspan=8, padx=(0, 0), pady=(10, 0), sticky=tk.W
+            row=3, column=0, columnspan=9, padx=(0, 0), pady=(10, 0), sticky=tk.W
         )
 
         self.cutoff_container = ttk.Frame(self, style="Surface.TFrame")
-        self.cutoff_panel = ttk.LabelFrame(
+        self.cutoff_panel = ThemedLabelFrame(
             self.cutoff_container,
             text="Alpha-Beta cut-off by turn",
-            padding=8,
             style="Panel.TLabelframe",
         )
         self.cutoff_panel.pack(fill=tk.X)
+        cutoff_content = ttk.Frame(self.cutoff_panel, padding=8, style="Surface.TFrame")
+        cutoff_content.pack(fill=tk.X, expand=True)
         self.cutoff_log = tk.Text(
-            self.cutoff_panel,
+            cutoff_content,
             height=4,
             state=tk.DISABLED,
             bg=TEXT_BG,
@@ -525,7 +579,7 @@ class AIVsAIFrame(ttk.Frame):
         self.status_label = ttk.Label(self, textvariable=self.status_var, wraplength=980, style="Muted.TLabel")
         self.status_label.pack(anchor=tk.W, pady=(0, 8))
 
-        self.body = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
+        self.body = ThemedPanedWindow(self, orient=tk.HORIZONTAL)
         self.body.pack(fill=tk.BOTH, expand=True)
 
         self.original_pane = AutoPlaySessionPane(self.body, "Current / original roles")
@@ -566,6 +620,7 @@ class AIVsAIFrame(ttk.Frame):
         )
         self.branch_games = None
         self.branch_status_logged = set()
+        self.redo_steps = []
         self.game_settings = (size, x_mode, o_mode, depth, max_turns)
         self.original_pane.build(size)
         self.swapped_pane.build(size)
@@ -592,6 +647,7 @@ class AIVsAIFrame(ttk.Frame):
         if self.game.status() != "ONGOING":
             self.status_var.set(f"Game over: {self.game.status()}")
             return
+        self.redo_steps = []
         self._allow_one_main_step()
         self._start_main_step(keep_running=False)
 
@@ -600,6 +656,7 @@ class AIVsAIFrame(ttk.Frame):
             if self.branch_running:
                 self.pause()
             else:
+                self.redo_steps = []
                 self.branch_running = True
                 self._start_branch_step(keep_running=True)
             return
@@ -622,6 +679,7 @@ class AIVsAIFrame(ttk.Frame):
             return
 
         self.running = True
+        self.redo_steps = []
         self._start_main_step(keep_running=True)
 
     def pause(self) -> None:
@@ -660,6 +718,7 @@ class AIVsAIFrame(ttk.Frame):
         if self.game.status() == "ONGOING":
             self.game.max_turns = len(self.game.history) + next_moves
             self.running = True
+            self.redo_steps = []
             self.status_var.set(f"Resume will play at most {next_moves} more moves.")
             self._start_main_step(keep_running=True)
         else:
@@ -682,11 +741,40 @@ class AIVsAIFrame(ttk.Frame):
 
         if len(self.game.history) < self.game.max_turns:
             self.branch_status_logged = set()
+        self.redo_steps.append(undone)
         self.original_pane.load_history(self.game, "Current / original roles")
         self.status_var.set(
             f"Backed up turn {undone.turn:02d}. Next player is {self.game.current_player}. "
-            "Change X/O AI mode, then press Step or Run all."
+            "Use Next step to replay, or Step/Run all to create a new line."
         )
+
+    def redo_one_step(self) -> None:
+        if self.busy or self.running or self.branch_running:
+            self.status_var.set("Pause the game before replaying a backed-up step.")
+            return
+        if self.branch_games is not None:
+            self.status_var.set("Next step is available only before creating swap branches.")
+            return
+        if self.game is None:
+            return
+        if not self.redo_steps:
+            self.status_var.set("No backed-up move to replay.")
+            return
+
+        step = self.redo_steps.pop()
+        self.game.max_turns = max(self.game.max_turns, len(self.game.history) + 1)
+        if not self.game.replay_step(step):
+            self.redo_steps.append(step)
+            self.status_var.set("Cannot replay the backed-up move from the current board.")
+            return
+
+        self.branch_status_logged = set()
+        self.original_pane.load_history(self.game, "Current / original roles")
+        status = self._effective_status(self.game)
+        if status == "ONGOING":
+            self.status_var.set(f"Replayed turn {step.turn:02d}. Next player is {self.game.current_player}.")
+        else:
+            self.status_var.set(f"Game over: {status}")
 
     def swap_roles(self) -> None:
         if self.game is None or self.busy:
@@ -713,6 +801,7 @@ class AIVsAIFrame(ttk.Frame):
         swapped = self.game.clone_branch(swap_algorithms=True, additional_turns=additional_turns)
         self.branch_games = {"original": original, "swapped": swapped}
         self.branch_status_logged = set()
+        self.redo_steps = []
         self.original_pane.load_history(original, "Branch A: giữ nguyên vai")
         self.swapped_pane.load_history(swapped, "Branch B: đổi Minimax / Alpha-Beta")
         self.alpha_beta_cutoff_total = 0
@@ -1210,9 +1299,12 @@ class BenchmarkFrame(ttk.Frame):
         return depths
 
 
-class CaroApp(tk.Tk):
+class CaroApp(ttk.Window if USING_BOOTSTRAP_THEME else tk.Tk):
     def __init__(self):
-        super().__init__()
+        if USING_BOOTSTRAP_THEME:
+            super().__init__(themename=BOOTSTRAP_THEME)
+        else:
+            super().__init__()
         self.title("Caro AI")
         self.geometry("1280x820")
         self.minsize(1100, 700)
@@ -1227,35 +1319,130 @@ class CaroApp(tk.Tk):
         notebook.add(BenchmarkFrame(notebook), text="Benchmark")
 
     def _configure_style(self) -> None:
-        style = ttk.Style(self)
-        if "clam" in style.theme_names():
+        style = ttk.Style()
+        if USING_BOOTSTRAP_THEME:
+            style.theme_use(BOOTSTRAP_THEME)
+        elif "clam" in style.theme_names():
             style.theme_use("clam")
 
-        style.configure(".", font=("Segoe UI", 10), background=APP_BG, foreground="#111827")
+        self.option_add("*Font", ("Segoe UI", 10))
+        self.option_add("*TCombobox*Listbox.font", ("Segoe UI", 10))
+
+        style.configure(".", font=("Segoe UI", 10), background=APP_BG, foreground=INK)
         style.configure("TFrame", background=APP_BG)
         style.configure("Surface.TFrame", background=PANEL_BG)
-        style.configure("TLabel", background=APP_BG, foreground="#111827")
-        style.configure("Muted.TLabel", background=APP_BG, foreground="#475569")
-        style.configure("PanelMuted.TLabel", background=PANEL_BG, foreground="#475569")
+        style.configure("TLabel", background=APP_BG, foreground=INK)
+        style.configure("Muted.TLabel", background=APP_BG, foreground=MUTED)
+        style.configure("PanelMuted.TLabel", background=PANEL_BG, foreground=MUTED)
         style.configure("Metric.TLabel", background=APP_BG, foreground="#0f766e", font=("Segoe UI", 10, "bold"))
-        style.configure("TButton", padding=(12, 7), relief="flat", background="#e5e7eb")
+
+        style.configure(
+            "TButton",
+            padding=(14, 8),
+            relief="flat",
+            borderwidth=0,
+            focusthickness=0,
+            background="#e8edf5",
+            foreground=INK,
+        )
         style.map(
             "TButton",
-            background=[("active", "#d1d5db"), ("pressed", "#cbd5e1")],
+            background=[
+                ("disabled", "#edf1f6"),
+                ("pressed", "#cbd5e1"),
+                ("active", "#dbe4f0"),
+            ],
+            foreground=[("disabled", "#94a3b8")],
         )
-        style.configure("Accent.TButton", padding=(14, 8), background="#2563eb", foreground="#ffffff")
+        style.configure(
+            "Accent.TButton",
+            padding=(15, 9),
+            borderwidth=0,
+            focusthickness=0,
+            background=ACCENT,
+            foreground="#ffffff",
+        )
         style.map(
             "Accent.TButton",
-            background=[("active", "#1d4ed8"), ("pressed", "#1e40af")],
-            foreground=[("active", "#ffffff")],
+            background=[("pressed", ACCENT_PRESSED), ("active", ACCENT_HOVER), ("disabled", "#93c5fd")],
+            foreground=[("active", "#ffffff"), ("disabled", "#eff6ff")],
         )
-        style.configure("TNotebook", background=APP_BG, borderwidth=0)
-        style.configure("TNotebook.Tab", padding=(14, 8), background="#e5e7eb")
-        style.map("TNotebook.Tab", background=[("selected", PANEL_BG), ("active", "#f8fafc")])
-        style.configure("Panel.TLabelframe", background=PANEL_BG, bordercolor="#d1d5db", relief="solid")
-        style.configure("Panel.TLabelframe.Label", background=PANEL_BG, foreground="#0f172a", font=("Segoe UI", 10, "bold"))
-        style.configure("Treeview", background=TEXT_BG, fieldbackground=TEXT_BG, rowheight=26, borderwidth=0)
-        style.configure("Treeview.Heading", background="#e2e8f0", foreground="#0f172a", font=("Segoe UI", 10, "bold"))
+
+        for widget_style in ("TEntry", "TSpinbox", "TCombobox"):
+            style.configure(
+                widget_style,
+                padding=(8, 5),
+                fieldbackground=PANEL_BG,
+                background=PANEL_BG,
+                foreground=INK,
+                bordercolor="#cbd5e1",
+                lightcolor=PANEL_BG,
+                darkcolor="#cbd5e1",
+                arrowcolor=MUTED,
+                relief="flat",
+            )
+            style.map(
+                widget_style,
+                bordercolor=[("focus", ACCENT), ("active", "#94a3b8")],
+                fieldbackground=[("readonly", PANEL_BG), ("disabled", "#eef2f7")],
+                foreground=[("disabled", "#94a3b8")],
+                arrowcolor=[("active", ACCENT), ("disabled", "#94a3b8")],
+            )
+
+        style.configure("TNotebook", background=APP_BG, borderwidth=0, tabmargins=(0, 0, 0, 0))
+        style.configure(
+            "TNotebook.Tab",
+            padding=(18, 10),
+            background=APP_BG,
+            foreground=MUTED,
+            borderwidth=0,
+            font=("Segoe UI", 10, "bold"),
+        )
+        style.map(
+            "TNotebook.Tab",
+            background=[("selected", PANEL_BG), ("active", "#e8eef7")],
+            foreground=[("selected", ACCENT), ("active", INK)],
+            expand=[("selected", (0, 0, 0, 2))],
+        )
+
+        style.configure(
+            "Panel.TLabelframe",
+            background=PANEL_BG,
+            borderwidth=1,
+            bordercolor="#d8dee9",
+            lightcolor=PANEL_BG,
+            darkcolor="#d8dee9",
+            relief="solid",
+        )
+        style.configure(
+            "Panel.TLabelframe.Label",
+            background=PANEL_BG,
+            foreground=INK,
+            font=("Segoe UI", 10, "bold"),
+        )
+        style.configure(
+            "Treeview",
+            background=PANEL_BG,
+            fieldbackground=PANEL_BG,
+            foreground=INK,
+            rowheight=30,
+            borderwidth=0,
+            relief="flat",
+        )
+        style.map(
+            "Treeview",
+            background=[("selected", "#dbeafe")],
+            foreground=[("selected", "#0f172a")],
+        )
+        style.configure(
+            "Treeview.Heading",
+            background="#e8eef7",
+            foreground="#0f172a",
+            relief="flat",
+            padding=(8, 7),
+            font=("Segoe UI", 10, "bold"),
+        )
+        style.map("Treeview.Heading", background=[("active", "#dbe4f0")])
 
 
 def run_gui() -> None:

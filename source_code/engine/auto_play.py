@@ -110,6 +110,32 @@ class AutoPlayGame:
         self.current_player = step.player
         return step
 
+    def replay_step(self, step: AutoPlayStep) -> bool:
+        if step.move is None or self.status() != "ONGOING":
+            return False
+        if step.player != self.current_player:
+            return False
+
+        row, col = step.move
+        if not self.board.place_move(row, col, step.player):
+            return False
+
+        if step.turn != len(self.history) + 1:
+            step = AutoPlayStep(
+                turn=len(self.history) + 1,
+                player=step.player,
+                move=step.move,
+                score=step.score,
+                depth=step.depth,
+                nodes_visited=step.nodes_visited,
+                elapsed_time=step.elapsed_time,
+                algorithm=step.algorithm,
+                status_after_move=self.status(),
+            )
+        self.history.append(step)
+        self.current_player = AI if step.player == HUMAN else HUMAN
+        return True
+
     def update_ai_modes(self, x_mode: str, o_mode: str) -> None:
         x_mode = normalize_ai_mode(x_mode)
         o_mode = normalize_ai_mode(o_mode)

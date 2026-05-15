@@ -45,6 +45,20 @@ class GameEngine:
             removed.append(self._undo_last_move())
         return [move for move in removed if move is not None]
 
+    def replay_turn(self, removed_moves: list[HumanVsAIMove]) -> bool:
+        moves = list(reversed(removed_moves))
+        replayed: list[HumanVsAIMove] = []
+        for move in moves:
+            row, col = move.move
+            if not self.board.place_move(row, col, move.player):
+                for replayed_move in reversed(replayed):
+                    self.board.undo_move(replayed_move.move[0], replayed_move.move[1])
+                    self.history.pop()
+                return False
+            self.history.append(move)
+            replayed.append(move)
+        return True
+
     def _undo_last_move(self) -> HumanVsAIMove | None:
         if not self.history:
             return None

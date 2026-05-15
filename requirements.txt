@@ -1,5 +1,6 @@
-# Runtime uses only Python standard library.
+# Runtime uses Python standard library plus ttkbootstrap for the modern GUI theme.
 # Recommended Python version: >=3.10
+ttkbootstrap>=1.10
 #
 # Optional acceleration build:
 #   py -m pip install -r requirements.txt
