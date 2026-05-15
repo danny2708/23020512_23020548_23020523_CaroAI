@@ -9,6 +9,7 @@ if str(SOURCE_ROOT) not in sys.path:
 from core.board import Board
 from core.constants import AI, HUMAN
 from core.rules import check_winner
+from ai.evaluator import Evaluator
 from engine.auto_play import AutoPlayGame, AutoPlayStep
 from engine.ai_runner import create_ai
 from engine.game_engine import GameEngine, HumanVsAIMove
@@ -115,6 +116,34 @@ class TacticalSearchTests(unittest.TestCase):
         self.assertTrue(game.replay_step(removed))
         self.assertEqual(game.board.grid[4][4], HUMAN)
         self.assertEqual(game.current_player, AI)
+
+    def test_heuristic_breakdown_is_move_local(self):
+        board = Board.from_strings(
+            [
+                ".........",
+                ".........",
+                ".........",
+                "....X....",
+                "....O....",
+                ".........",
+                ".........",
+                ".........",
+                ".........",
+            ]
+        )
+        evaluator = Evaluator()
+
+        near_center = evaluator.score_breakdown(board, ai_player=AI, evaluated_move=(4, 3))
+        diagonal = evaluator.score_breakdown(board, ai_player=AI, evaluated_move=(3, 3))
+
+        self.assertGreater(near_center["score_attack"], 0)
+        self.assertGreater(diagonal["score_defense"], 0)
+        self.assertGreater(near_center["position_weight"], 0)
+        self.assertNotEqual(near_center["final_heuristic_score"], diagonal["final_heuristic_score"])
+        self.assertEqual(
+            near_center["final_heuristic_score"],
+            near_center["score_attack"] + near_center["score_defense"] + near_center["position_weight"],
+        )
 
 
 if __name__ == "__main__":

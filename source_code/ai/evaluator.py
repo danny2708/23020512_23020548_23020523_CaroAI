@@ -51,11 +51,13 @@ class Evaluator:
         ai_player: str = AI,
         evaluated_move: tuple[int, int] | None = None,
     ) -> dict[str, int]:
-        """Return the heuristic components used by the benchmark EDA logs."""
+        """Return move-local heuristic components for benchmark EDA logs."""
+        if evaluated_move is not None:
+            return self._move_breakdown(board, ai_player, evaluated_move)
+
         terminal_score = get_terminal_score(board, ai_player)
         if terminal_score is not None:
             return self._terminal_breakdown(terminal_score)
-
         opponent = get_opponent(ai_player)
         attack_score = 0
         defense_score = 0
@@ -78,8 +80,35 @@ class Evaluator:
             if ai_count:
                 attack_score += self._score_counts(ai_count, empty_count)
             elif opponent_count:
-                defense_score -= self._score_counts(opponent_count, empty_count)
+                defense_score += self._score_counts(opponent_count, empty_count)
 
+        position_weight = self._position_weight(board, evaluated_move)
+        final_score = attack_score + defense_score + position_weight
+        return {
+            "score_attack": attack_score,
+            "score_defense": defense_score,
+            "position_weight": position_weight,
+            "final_heuristic_score": final_score,
+        }
+
+    def _move_breakdown(
+        self,
+        board: Board,
+        ai_player: str,
+        evaluated_move: tuple[int, int],
+    ) -> dict[str, int]:
+        row, col = evaluated_move
+        if not board.is_empty_cell(row, col):
+            return {
+                "score_attack": 0,
+                "score_defense": 0,
+                "position_weight": 0,
+                "final_heuristic_score": 0,
+            }
+
+        opponent = get_opponent(ai_player)
+        attack_score = self._local_move_score(board, row, col, ai_player)
+        defense_score = self._local_move_score(board, row, col, opponent)
         position_weight = self._position_weight(board, evaluated_move)
         final_score = attack_score + defense_score + position_weight
         return {
@@ -147,8 +176,53 @@ class Evaluator:
         return 0
 
     def _position_weight(self, board: Board, evaluated_move: tuple[int, int] | None) -> int:
-        # The current assignment heuristic does not add positional weight to the final score.
-        # Keep this component explicit so EDA can show that the deployed evaluator is pattern-based.
+        if evaluated_move is None:
+            return 0
+
+        row, col = evaluated_move
+        center = (board.size - 1) / 2
+        max_distance = board.size - 1
+        distance = abs(row - center) + abs(col - center)
+        return max(0, int((max_distance - distance + 1) * 5))
+
+    def _local_move_score(self, board: Board, row: int, col: int, player: str) -> int:
+        score = 0
+        for dr, dc in DIRECTIONS:
+            count, open_ends = self._line_metrics(board, row, col, player, dr, dc)
+            score += self._score_line(count, open_ends)
+        return score
+
+    def _line_metrics(self, board: Board, row: int, col: int, player: str, dr: int, dc: int) -> tuple[int, int]:
+        count = 1
+        open_ends = 0
+
+        nr, nc = row + dr, col + dc
+        while board.in_bounds(nr, nc) and board.grid[nr][nc] == player:
+            count += 1
+            nr += dr
+            nc += dc
+        if board.in_bounds(nr, nc) and board.grid[nr][nc] == EMPTY:
+            open_ends += 1
+
+        nr, nc = row - dr, col - dc
+        while board.in_bounds(nr, nc) and board.grid[nr][nc] == player:
+            count += 1
+            nr -= dr
+            nc -= dc
+        if board.in_bounds(nr, nc) and board.grid[nr][nc] == EMPTY:
+            open_ends += 1
+
+        return count, open_ends
+
+    def _score_line(self, count: int, open_ends: int) -> int:
+        if count >= WIN_LENGTH:
+            return 100_000
+        if count == WIN_LENGTH - 1:
+            return 1_500 if open_ends == 2 else 1_000
+        if count == WIN_LENGTH - 2:
+            return 150 if open_ends == 2 else 100
+        if count == 1:
+            return 10 * open_ends
         return 0
 
     def _terminal_breakdown(self, terminal_score: int) -> dict[str, int]:

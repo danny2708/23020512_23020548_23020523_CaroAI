@@ -114,10 +114,7 @@ def _append_heuristic_rows(test_id: str, board: Board, ai, rows: list[dict]) -> 
         is_root=True,
     )
     for move in moves:
-        row, col = move
-        board.place_move(row, col, AI)
         breakdown = ai.evaluator.score_breakdown(board, ai_player=AI, evaluated_move=move)
-        board.undo_move(row, col)
 
         move_x, move_y = _move_to_xy(move)
         rows.append(
