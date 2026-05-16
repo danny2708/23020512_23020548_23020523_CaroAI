@@ -1,177 +1,148 @@
 # Caro AI - Minimax và Alpha-Beta
 
-Project phục vụ bài tập Caro AI.
+Project phục vụ bài tập AI cờ Caro. Chương trình hỗ trợ chơi `Human vs AI`, `AI vs AI` và chạy benchmark để so sánh Minimax với Alpha-Beta theo đúng yêu cầu báo cáo.
 
-## Yêu cầu chính
+## 1. Yêu cầu môi trường
 
-- Bàn cờ Caro kích thước tối thiểu `9x9`.
-- Human `X` vs AI `O`.
-- Điều kiện thắng: 4 quân liên tiếp theo hàng ngang, dọc hoặc chéo.
-- Level 1: Minimax có giới hạn độ sâu.
-- Level 2: Alpha-Beta pruning dùng cùng evaluator và cùng depth.
-- Level 3: Benchmark Minimax và Alpha-Beta trên cùng trạng thái bàn cờ.
+- Python `>= 3.10`.
+- Hệ điều hành Windows/Linux/macOS đều có thể chạy bản Python thuần.
+- Giao diện dùng `tkinter`; nếu cài thêm `ttkbootstrap` thì UI sẽ dùng theme hiện đại hơn.
 
-## Cấu trúc
+Cài thư viện:
 
-```text
-source_code/
-|-- main.py
-|-- accel/
-|   |-- __init__.py
-|   `-- caro_accel.pyx
-|-- core/
-|   |-- board.py
-|   |-- constants.py
-|   |-- move_generator.py
-|   `-- rules.py
-|-- ai/
-|   |-- base_search.py
-|   |-- evaluator.py
-|   |-- minimax.py
-|   `-- alpha_beta.py
-|-- engine/
-|   |-- ai_runner.py
-|   |-- auto_play.py
-|   `-- game_engine.py
-|-- benchmark/
-|   |-- benchmark_runner.py
-|   |-- result_writer.py
-|   `-- test_states.py
-|-- ui/
-|   |-- console_ui.py
-|   `-- tkinter_ui.py
-`-- results/
-```
-
-## Chạy UI
-
-Từ thư mục gốc:
-
-```bash
-cd source_code
-python main.py
-```
-
-UI có các chế độ:
-
-- Human X vs AI O
-- AI X vs AI O
-- Benchmark Minimax vs Alpha-Beta
-
-## Human vs AI
-
-- `Back step`: lùi lại lượt gần nhất. Nếu AI vừa đi xong, thao tác này xóa cả nước AI và nước Human ngay trước đó để trả về lượt Human. Sau đó có thể đổi AI mode/depth cho nước kế tiếp.
-
-## Các chế độ AI
-
-- `minimax`: Minimax chuẩn trong tập nước đi ứng viên gần quân đã đánh. Chế độ này dùng các tối ưu an toàn như cache đánh giá, transposition table, Zobrist hash và kiểm tra thắng quanh nước cuối.
-- `alphabeta`: Alpha-Beta chuẩn trong cùng tập nước đi ứng viên. Move ordering chỉ đổi thứ tự duyệt để cắt tỉa tốt hơn.
-- `minimax-improve`: Minimax có thêm beam pruning / forward pruning động.
-- `alphabeta-improve`: Alpha-Beta có thêm beam pruning / forward pruning động.
-
-Lưu ý: `*-improve` là chế độ AI thực dụng để chạy depth cao nhanh hơn. Vì beam pruning / forward pruning có thể bỏ qua một số nước hợp lệ, kết quả chọn nước và score có thể khác thuật toán chuẩn.
-
-## AI vs AI
-
-Trong AI X vs AI O:
-
-- `Pause`: dừng autoplay an toàn.
-- `Back step`: sau khi pause, lùi lại một nước cuối cùng để chọn lại model cho lượt kế tiếp.
-- `Resume`: tiếp tục ván cờ hoặc thêm batch nước mới nếu đã hết giới hạn hiện tại.
-- `Swap roles`: lưu trạng thái hiện tại và tạo hai nhánh tiếp diễn.
-- `Save state`: lưu bàn cờ và log hiện tại.
-
-Cut-off panel chỉ hiện khi một họ Alpha-Beta bất kỳ đối đầu với một họ Minimax bất kỳ. Nếu là Alpha-Beta vs Alpha-Beta hoặc Minimax vs Minimax thì panel này bị ẩn. Nếu hai AI dùng đúng cùng một mode, UI cũng ẩn `Swap roles` và bàn cờ nhánh phụ vì đổi vai sẽ tạo ra cùng một phiên.
-
-Log và snapshot được lưu dưới:
-
-```text
-source_code/results/sessions/
-```
-
-## Tối ưu hiệu suất
-
-Pipeline hiện có các tối ưu không làm đổi thuật toán tìm kiếm chuẩn:
-
-- Zobrist hash trên `Board` để tạo key nhanh cho transposition table.
-- `cell_codes` dạng số nguyên phẳng trên `Board` để giảm chi phí truy cập grid.
-- Transposition table cho Minimax và Alpha-Beta.
-- Kiểm tra thắng quanh nước cuối thay vì quét toàn bàn ở mọi node.
-- Cache evaluator theo `(board_hash, ai_player)`.
-- Optional Cython acceleration cho các hot path:
-  - `evaluate_codes`
-  - `check_winner_at_codes`
-  - `check_winner_full_codes`
-  - `quick_move_score_codes`
-
-Nếu chưa build Cython extension, code tự fallback về Python implementation.
-
-## Build Cython acceleration
-
-Cài dependency:
-
-```bash
+```powershell
 py -m pip install -r requirements.txt
 ```
 
-Build extension:
+Nếu chỉ muốn chạy logic Python cơ bản, chương trình vẫn có thể fallback khi chưa build Cython.
 
-```bash
-py setup_accel.py build_ext --inplace
+## 2. Cấu trúc thư mục chính
+
+```text
+source_code/
+|-- main.py                    # Điểm chạy chương trình
+|-- core/                      # Board, luật chơi, sinh nước đi
+|-- ai/                        # Minimax, Alpha-Beta, evaluator
+|-- engine/                    # Điều phối ván chơi
+|-- ui/                        # Tkinter UI và console UI
+|-- benchmark/                 # Bộ benchmark và xuất CSV
+`-- results/                   # Kết quả benchmark, log, session
 ```
 
-Trên Windows cần Microsoft C++ Build Tools. Nếu thiếu compiler, lệnh build sẽ báo lỗi `Microsoft Visual C++ 14.0 or greater is required`; khi đó chương trình vẫn chạy fallback Python.
+Tài liệu báo cáo nằm trong:
 
-Kiểm tra extension đã được dùng chưa:
-
-```bash
-py -c "import sys; sys.path.insert(0, 'source_code'); from accel import CYTHON_AVAILABLE; print(CYTHON_AVAILABLE)"
+```text
+docs/bao_cao_caro_ai.md
 ```
 
-Kết quả `True` nghĩa là pipeline đang dùng Cython extension.
+## 3. Chạy giao diện chính
 
-## Chạy console
+Từ thư mục gốc project:
 
-```bash
-cd source_code
-python main.py --console
+```powershell
+py source_code\main.py
 ```
 
-## Chạy benchmark
+Giao diện có ba tab:
 
-Từ thư mục gốc:
+- `Human vs AI`: người chơi `X` đánh với AI `O`.
+- `AI vs AI`: hai AI tự đánh với nhau, có thể pause/resume/back step/swap roles.
+- `Benchmark`: chạy thực nghiệm so sánh thuật toán và xuất file CSV.
 
-```bash
-python source_code/benchmark/benchmark_runner.py
+## 4. Chạy console
+
+Nếu muốn chạy bản console:
+
+```powershell
+py source_code\main.py --console
 ```
 
-Kết quả benchmark được ghi vào:
+Bản console phù hợp để kiểm tra nhanh logic trò chơi, nhưng để dùng đầy đủ các chức năng hiện tại nên chạy UI.
+
+## 5. Các chế độ AI
+
+Trong UI, các lựa chọn AI gồm:
+
+- `1 - minimax`: Minimax chuẩn.
+- `2 - alphabeta`: Alpha-Beta chuẩn, dùng cùng evaluator và cùng độ sâu với Minimax khi so sánh.
+- `3 - minimax-improve`: Minimax có thêm giới hạn ứng viên/beam pruning/forward pruning để chạy depth cao nhanh hơn.
+- `4 - alphabeta-improve`: Alpha-Beta có thêm các cải tiến tương tự.
+
+Lưu ý cho báo cáo: hai mode `*-improve` là chế độ thực dụng để tăng tốc. Vì có thể bỏ qua một số nước hợp lệ, chúng không nên dùng để chứng minh Alpha-Beta tương đương Minimax chuẩn. Khi so sánh lý thuyết, dùng `minimax` và `alphabeta`.
+
+## 6. Cách dùng nhanh trong UI
+
+### Human vs AI
+
+1. Chọn `Board size`, `AI mode`, `Depth`.
+2. Nhấn `New game`.
+3. Click ô trống để đánh quân `X`.
+4. AI tự đánh quân `O`.
+5. Có thể dùng `Back step` để lùi lại lượt gần nhất, sau đó đổi model/depth cho nước tiếp theo.
+
+### AI vs AI
+
+1. Chọn thuật toán cho `X AI` và `O AI`.
+2. Chọn `Depth`, `Max turns`, `Next moves`.
+3. Nhấn `New game`, `Step` hoặc `Run all`.
+4. `Pause` dừng ván hiện tại.
+5. `Resume` chạy tiếp theo số nước đặt trong `Next moves`.
+6. `Back step` lùi một nước sau khi pause.
+7. `Swap roles` tạo nhánh phụ khi hai AI khác vai trò/thuật toán.
+8. `Save state` lưu thế cờ và log vào `source_code/results/sessions/`.
+
+## 7. Chạy benchmark
+
+Từ thư mục gốc project:
+
+```powershell
+py source_code\benchmark\benchmark_runner.py
+```
+
+Benchmark mặc định chạy 5 thế cờ kiểm thử với các depth `1`, `2`, `3`, `4`, so sánh `Minimax` và `Alpha-Beta` trên cùng trạng thái, cùng evaluator và cùng move generator.
+
+Các file kết quả được ghi vào:
 
 ```text
 source_code/results/benchmark_summary.csv
 source_code/results/pruning_details.csv
 source_code/results/eval_heuristic_log.csv
+source_code/results/move_matching.csv
 ```
 
-`benchmark_summary.csv` chứa kết quả tổng quan theo từng `Test_ID`, thế cờ, thuật toán, depth,
-nước đi tốt nhất, điểm heuristic, số node đã duyệt, thời gian chạy và trạng thái có nhìn thấy
-thắng/thua hay không.
-Các tọa độ `*_X` là chỉ số cột và `*_Y` là chỉ số hàng, đều bắt đầu từ `0`.
+Ý nghĩa các file:
 
-`pruning_details.csv` chỉ có dữ liệu từ Alpha-Beta, ghi lại độ sâu cắt nhánh, alpha/beta tại thời
-điểm cắt, ước lượng số node được bỏ qua và thứ tự timestamp.
+- `benchmark_summary.csv`: kết quả tổng quan theo từng test, gồm thuật toán, depth, best move, score, số node, thời gian chạy và trạng thái thắng/thua được phát hiện.
+- `pruning_details.csv`: chi tiết các lần Alpha-Beta cắt nhánh, gồm depth cắt, alpha, beta, số node ước lượng đã bỏ qua và timestamp.
+- `eval_heuristic_log.csv`: breakdown heuristic cho các nước ứng viên ở root, gồm điểm tấn công, phòng thủ, vị trí và tổng điểm.
+- `move_matching.csv`: bảng đối chiếu trực tiếp câu hỏi “Alpha-Beta có chọn cùng nước đi với Minimax không?”. Cột `Same_Move=True` nghĩa là hai thuật toán chọn cùng nước đi ở cùng `State_Name` và `Depth_Limit`.
 
-`eval_heuristic_log.csv` ghi breakdown heuristic cho các nước ứng viên ở root: điểm tấn công,
-điểm phòng thủ, trọng số vị trí và điểm cuối cùng. Hiện tại `Position_Weight` được để `0` vì
-evaluator chính của pipeline đang dựa trên mẫu quân công/thủ, chưa cộng điểm vị trí vào score.
+Tọa độ trong CSV dùng dạng `(X, Y)`, trong đó `X` là cột, `Y` là hàng và đều bắt đầu từ `0`.
 
-## Ghi chú báo cáo
+## 8. Build Cython acceleration tùy chọn
 
-Khi so sánh Minimax và Alpha-Beta, cần dùng:
+Để tăng tốc một số hot path:
 
-- cùng trạng thái bàn cờ,
-- cùng search depth,
-- cùng evaluator,
-- cùng move generator.
+```powershell
+py setup_accel.py build_ext --inplace
+```
 
-Nếu dùng `nearby` candidate generation, move ordering, beam width hoặc Cython acceleration, cần mô tả rõ trong báo cáo.
+Kiểm tra extension đã được dùng chưa:
+
+```powershell
+py -c "import sys; sys.path.insert(0, 'source_code'); from accel import CYTHON_AVAILABLE; print(CYTHON_AVAILABLE)"
+```
+
+Nếu kết quả là `True`, chương trình đang dùng Cython. Nếu build lỗi do thiếu compiler, chương trình vẫn chạy bằng Python thuần.
+
+## 9. Ghi chú khi viết báo cáo
+
+Khi so sánh Minimax và Alpha-Beta, cần đảm bảo:
+
+- Cùng trạng thái bàn cờ.
+- Cùng depth.
+- Cùng evaluator.
+- Cùng move generator.
+- Không dùng mode `*-improve` cho phần chứng minh tương đương thuật toán chuẩn.
+
+File `move_matching.csv` nên được dùng cho phần kiểm chứng tính đúng đắn: Alpha-Beta phải chọn cùng nước đi với Minimax ở cùng state/depth nếu cài đặt đúng và thứ tự sinh nước không làm thay đổi tie-breaking.

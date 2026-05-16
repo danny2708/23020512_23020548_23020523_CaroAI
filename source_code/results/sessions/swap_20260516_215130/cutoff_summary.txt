@@ -1,0 +1,6 @@
+alpha_beta_cutoff_nodes_total=48784
+Turn 08 | Alpha-Beta's nodes: 562 | Minimax's nodes=8246 | Nodes cut off=7684
+Turn 09 | Alpha-Beta's nodes: 183 | Minimax's nodes=7976 | Nodes cut off=7793
+Turn 10 | Alpha-Beta's nodes: 822 | Minimax's nodes=10386 | Nodes cut off=9564
+Turn 11 | Alpha-Beta's nodes: 86 | Minimax's nodes=10737 | Nodes cut off=10651
+Turn 12 | Alpha-Beta's nodes: 609 | Minimax's nodes=13701 | Nodes cut off=13092

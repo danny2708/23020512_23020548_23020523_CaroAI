@@ -1,0 +1,11 @@
+alpha_beta_cutoff_nodes_total=2983321
+Turn 04 | Alpha-Beta's nodes: 1323 | Minimax's nodes=80606 | Nodes cut off=79283
+Turn 05 | Alpha-Beta's nodes: 1927 | Minimax's nodes=135935 | Nodes cut off=134008
+Turn 06 | Alpha-Beta's nodes: 1253 | Minimax's nodes=235955 | Nodes cut off=234702
+Turn 07 | Alpha-Beta's nodes: 2180 | Minimax's nodes=367648 | Nodes cut off=365468
+Turn 08 | Alpha-Beta's nodes: 2980 | Minimax's nodes=326134 | Nodes cut off=323154
+Turn 09 | Alpha-Beta's nodes: 2564 | Minimax's nodes=331630 | Nodes cut off=329066
+Turn 10 | Alpha-Beta's nodes: 1894 | Minimax's nodes=332352 | Nodes cut off=330458
+Turn 11 | Alpha-Beta's nodes: 2078 | Minimax's nodes=290389 | Nodes cut off=288311
+Turn 12 | Alpha-Beta's nodes: 1080 | Minimax's nodes=352135 | Nodes cut off=351055
+Turn 13 | Alpha-Beta's nodes: 1671 | Minimax's nodes=549487 | Nodes cut off=547816

@@ -1,0 +1,20 @@
+X=alphabeta
+O=minimax
+depth=3
+current_player=X
+turns=12
+max_turns=12
+total_nodes=44362
+total_time=0.472678
+Turn 01 | Player X | Minimax | move=(4, 4) | score=400 | depth=3 | nodes=97 | time=0.001152s
+Turn 02 | Player O | Alpha-Beta | move=(5, 5) | score=100 | depth=3 | nodes=318 | time=0.004673s
+Turn 03 | Player X | Minimax | move=(5, 4) | score=970 | depth=3 | nodes=3044 | time=0.034496s
+Turn 04 | Player O | Alpha-Beta | move=(6, 4) | score=660 | depth=3 | nodes=253 | time=0.004112s
+Turn 05 | Player X | Alpha-Beta | move=(4, 6) | score=860 | depth=3 | nodes=437 | time=0.005674s
+Turn 06 | Player O | Minimax | move=(4, 5) | score=770 | depth=3 | nodes=7129 | time=0.073446s
+Turn 07 | Player X | Alpha-Beta | move=(3, 5) | score=2190 | depth=3 | nodes=482 | time=0.006475s
+Turn 08 | Player O | Minimax | move=(6, 5) | score=1620 | depth=3 | nodes=8246 | time=0.083877s
+Turn 09 | Player X | Alpha-Beta | move=(7, 5) | score=1340 | depth=3 | nodes=183 | time=0.003768s
+Turn 10 | Player O | Minimax | move=(6, 6) | score=100000 | depth=3 | nodes=10386 | time=0.109615s
+Turn 11 | Player X | Alpha-Beta | move=(6, 7) | score=-100001 | depth=3 | nodes=86 | time=0.002792s
+Turn 12 | Player O | Minimax | move=(6, 3) | score=100002 | depth=3 | nodes=13701 | time=0.142597s
