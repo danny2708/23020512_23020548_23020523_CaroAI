@@ -1,6 +1,6 @@
 # Caro AI - Minimax và Alpha-Beta
 
-Project phục vụ bài tập AI cờ Caro. Chương trình hỗ trợ chơi `Human vs AI`, `AI vs AI` và chạy benchmark để so sánh Minimax với Alpha-Beta theo đúng yêu cầu báo cáo.
+Project phục vụ bài tập AI cờ Caro. Chương trình hỗ trợ chơi `Human vs AI`, `AI vs AI` và chạy benchmark để so sánh Minimax với Alpha-Beta.
 
 ## 1. Yêu cầu môi trường
 
@@ -134,15 +134,3 @@ py -c "import sys; sys.path.insert(0, 'source_code'); from accel import CYTHON_A
 ```
 
 Nếu kết quả là `True`, chương trình đang dùng Cython. Nếu build lỗi do thiếu compiler, chương trình vẫn chạy bằng Python thuần.
-
-## 9. Ghi chú khi viết báo cáo
-
-Khi so sánh Minimax và Alpha-Beta, cần đảm bảo:
-
-- Cùng trạng thái bàn cờ.
-- Cùng depth.
-- Cùng evaluator.
-- Cùng move generator.
-- Không dùng mode `*-improve` cho phần chứng minh tương đương thuật toán chuẩn.
-
-File `move_matching.csv` nên được dùng cho phần kiểm chứng tính đúng đắn: Alpha-Beta phải chọn cùng nước đi với Minimax ở cùng state/depth nếu cài đặt đúng và thứ tự sinh nước không làm thay đổi tie-breaking.
