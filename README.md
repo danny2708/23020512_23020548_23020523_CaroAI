@@ -114,6 +114,8 @@ source_code/results/move_matching.csv
 
 Tọa độ trong CSV dùng dạng `(X, Y)`, trong đó `X` là cột, `Y` là hàng và đều bắt đầu từ `0`.
 
+## Chi tiết phân tích các biểu đồ dữ liệu xem trong source_code/Notebook/eda-for-caro-ai.ipynb
+
 ## 8. Build Cython acceleration tùy chọn
 
 Để tăng tốc một số hot path:
