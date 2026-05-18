@@ -29,11 +29,6 @@ source_code/
 `-- results/                   # Kết quả benchmark, log, session
 ```
 
-Tài liệu báo cáo nằm trong:
-
-```text
-docs/bao_cao_caro_ai.md
-```
 
 ## 3. Chạy giao diện chính
 
